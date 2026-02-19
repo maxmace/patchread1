@@ -2,55 +2,72 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ensoniq SQ-80 / ESQ-1 Manager</title>
+    <title>Ensoniq SQ-80/ESQ-1 Librarian</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1a1a1a; color: #e0e0e0; padding: 20px; line-height: 1.5; }
-        
-        /* Drop Zone */
-        #drop-zone {
-            width: 100%; height: 100px; border: 2px dashed #444;
-            display: flex; align-items: center; justify-content: center;
-            background: #252525; cursor: pointer; margin-bottom: 15px;
-            transition: all 0.2s ease;
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --module: #2a2a2a;
+            --accent: #0078d4;
+            --text: #e0e0e0;
+            --label: #888;
+            --sq80: #d4a017;
+            --esq1: #27ae60;
         }
-        #drop-zone:hover { border-color: #0078d4; background: #2a2a2a; }
-        
-        /* Status & Summary Line */
-        #status-bar { 
-            background: #333; padding: 10px 15px; border-radius: 4px; 
-            margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;
-            border-left: 4px solid #555;
-        }
-        .tag { font-size: 0.8rem; padding: 3px 8px; border-radius: 3px; font-weight: bold; text-transform: uppercase; }
-        .tag-sq80 { background: #d4a017; color: #000; }
-        .tag-esq1 { background: #27ae60; color: #fff; }
 
-        /* Grid for Bank View */
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        
+        /* Header & Status */
+        #drop-zone {
+            width: 100%; height: 80px; border: 2px dashed #444;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px;
+        }
+        #drop-zone:hover { border-color: var(--accent); }
+        
+        #status-bar { 
+            background: var(--panel); padding: 12px 20px; border-radius: 8px; 
+            margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #333;
+        }
+
+        .tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; font-weight: bold; }
+        .tag-sq80 { background: var(--sq80); color: #000; }
+        .tag-esq1 { background: var(--esq1); color: #fff; }
+
+        /* Patch Grid */
         .patch-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
             gap: 8px; margin-bottom: 30px;
         }
         .patch-item {
-            background: #2d2d2d; padding: 12px 5px; border-radius: 3px; cursor: pointer;
-            text-align: center; border: 1px solid #3d3d3d; font-size: 0.9rem;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            background: var(--panel); padding: 10px; border-radius: 4px; cursor: pointer;
+            text-align: center; border: 1px solid #333; font-size: 0.85rem;
         }
-        .patch-item:hover { background: #3d3d3d; border-color: #0078d4; }
-        .patch-item.selected { background: #0078d4; color: white; border-color: #fff; }
+        .patch-item:hover { border-color: var(--accent); background: #252525; }
+        .patch-item.selected { background: var(--accent); color: white; border-color: white; }
 
-        /* Editor Section */
-        .editor-container { display: none; background: #252525; padding: 20px; border-radius: 8px; border: 1px solid #444; }
-        table { width: 100%; border-collapse: collapse; font-family: monospace; }
-        th, td { border: 1px solid #333; padding: 10px; text-align: left; }
-        th { background: #111; color: #888; }
-        tr:nth-child(even) { background: #2a2a2a; }
+        /* Dashboard Layout */
+        .dashboard {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+            gap: 15px; display: none;
+        }
+        .module { background: var(--module); border-radius: 6px; overflow: hidden; border: 1px solid #444; }
+        .module-header { background: #333; padding: 6px 12px; font-size: 0.8rem; font-weight: bold; color: #aaa; border-bottom: 1px solid #444; }
+        
+        .param-grid { display: grid; grid-template-columns: 60px repeat(4, 1fr); }
+        .cell { border: 1px solid #333; padding: 8px; font-family: 'Courier New', monospace; position: relative; }
+        .cell.mod-row { background: #222; }
+        .label { color: var(--label); font-size: 0.65rem; display: block; text-transform: uppercase; }
+        .val { color: #fff; font-size: 1rem; font-weight: bold; }
+        
+        /* Envelope Specials */
+        .env-grid { grid-template-columns: 60px repeat(4, 1fr); }
     </style>
 </head>
 <body>
 
-    <h2>Ensoniq Librarian</h2>
-    
-    <div id="drop-zone">Drag & Drop .SYX / .MDX or Click</div>
+    <div id="drop-zone">Drag & Drop .SYX / .MDX or Click to Load</div>
     <input type="file" id="file-input" accept=".syx,.mdx" style="display: none;">
 
     <div id="status-bar">
@@ -60,27 +77,18 @@
 
     <div id="patch-list" class="patch-grid"></div>
 
-    <div id="editor" class="editor-container">
-        <h3 id="current-patch-name">Patch Editor</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Parameter</th>
-                    <th>Value</th>
-                    <th>Hex</th>
-                    <th>Details</th>
-                </tr>
-            </thead>
-            <tbody id="param-table-body"></tbody>
-        </table>
-    </div>
+    <div id="dashboard" class="dashboard">
+        </div>
 
     <script>
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const patchList = document.getElementById('patch-list');
+        const dashboard = document.getElementById('dashboard');
         const fileInfo = document.getElementById('file-info');
         const modelBadge = document.getElementById('model-badge');
+
+        const MOD_SOURCES = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL2", "KYBD", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
 
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); });
@@ -104,77 +112,131 @@
         }
 
         function detectModel(pcb) {
-            let sq80Markers = 0;
-            [0, 5, 10].forEach(off => { if(pcb[off] > 31) sq80Markers++; }); // Waves
-            if (pcb[22] & 0x40) sq80Markers++; // 2nd Release
-            [42, 54, 66, 78].forEach(off => { if(pcb[off] & 0x40) sq80Markers++; }); // Env Lin/Exp
-            return sq80Markers > 0 ? 'SQ80' : 'ESQ1';
+            let sq80 = 0;
+            [0, 5, 10].forEach(o => { if(pcb[o] > 31) sq80++; }); // Waves
+            if (pcb[22] & 0x40) sq80++; // 2nd Rel
+            [42, 54, 66, 78].forEach(o => { if(pcb[o] & 0x40) sq80++; }); // Env Lin
+            return sq80 > 0 ? 'SQ80' : 'ESQ1';
         }
 
         function processSysEx(data, filename) {
-            if (data[0] !== 0xF0 || data[1] !== 0x0F) return alert("Invalid Ensoniq SysEx");
-
+            if (data[0] !== 0xF0 || data[1] !== 0x0F) return alert("Not an Ensoniq SysEx file.");
+            
             patchList.innerHTML = '';
             let patches = [];
-            let bankHasSQ80 = false;
+            let bankIsSQ80 = false;
 
             if (data.length < 500) {
                 const pcb = unpackNibbles(data, 10);
-                if(detectModel(pcb) === 'SQ80') bankHasSQ80 = true;
+                if(detectModel(pcb) === 'SQ80') bankIsSQ80 = true;
                 patches.push({ name: extractName(pcb), pcb: pcb });
             } else {
                 let offset = 10;
                 for (let i = 0; i < 40; i++) {
                     const pcb = unpackNibbles(data, offset);
-                    if(detectModel(pcb) === 'SQ80') bankHasSQ80 = true;
+                    if(detectModel(pcb) === 'SQ80') bankIsSQ80 = true;
                     patches.push({ name: extractName(pcb), pcb: pcb });
                     offset += 204;
                 }
             }
 
-            // Update the Status Line once
             fileInfo.innerText = `${filename} (${patches.length} Patches)`;
-            modelBadge.innerHTML = bankHasSQ80 
-                ? `<span class="tag tag-sq80">SQ-80 Data Detected</span>` 
-                : `<span class="tag tag-esq1">ESQ-1 Compatible</span>`;
-
-            renderGrid(patches);
+            modelBadge.innerHTML = bankIsSQ80 ? `<span class="tag tag-sq80">SQ-80 DATA</span>` : `<span class="tag tag-esq1">ESQ-1 COMPATIBLE</span>`;
+            
+            patches.forEach((p, idx) => {
+                const div = document.createElement('div');
+                div.className = 'patch-item';
+                div.innerText = p.name;
+                div.onclick = () => {
+                    document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
+                    div.classList.add('selected');
+                    drawDashboard(p.pcb, p.name);
+                };
+                patchList.appendChild(div);
+            });
         }
 
         function extractName(pcb) {
             return String.fromCharCode(...pcb.slice(94, 100)).trim() || "UNTITL";
         }
 
-        function renderGrid(patches) {
-            patches.forEach((p, idx) => {
-                const div = document.createElement('div');
-                div.className = 'patch-item';
-                div.innerText = p.name;
-                div.onclick = function() {
-                    document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
-                    this.classList.add('selected');
-                    loadPatchToEditor(p);
-                };
-                patchList.appendChild(div);
-            });
+        function drawDashboard(pcb, name) {
+            dashboard.style.display = 'grid';
+            dashboard.innerHTML = '';
+
+            // Layout Modules
+            dashboard.innerHTML += createOscModule("OSCILLATOR 1", pcb, 0, 12);
+            dashboard.innerHTML += createOscModule("OSCILLATOR 2", pcb, 5, 16);
+            dashboard.innerHTML += createOscModule("OSCILLATOR 3", pcb, 10, 20);
+            dashboard.innerHTML += createFilterModule(pcb);
+            dashboard.innerHTML += createEnvModule("ENVELOPE 1", pcb, 42);
+            dashboard.innerHTML += createEnvModule("ENVELOPE 2", pcb, 54);
+            dashboard.innerHTML += createEnvModule("ENVELOPE 3", pcb, 66);
+            dashboard.innerHTML += createEnvModule("ENVELOPE 4", pcb, 78);
         }
 
-        function loadPatchToEditor(patch) {
-            document.getElementById('editor').style.display = 'block';
-            document.getElementById('current-patch-name').innerText = `Patch: ${patch.name}`;
-            const tbody = document.getElementById('param-table-body');
-            tbody.innerHTML = '';
+        function createOscModule(title, pcb, base, modBase) {
+            return `
+            <div class="module">
+                <div class="module-header">${title}</div>
+                <div class="param-grid">
+                    <div class="cell">MAIN</div>
+                    <div class="cell"><span class="label">OCT</span><span class="val">${((pcb[base+1] & 0xF0) >> 4) - 3}</span></div>
+                    <div class="cell"><span class="label">SEMI</span><span class="val">${pcb[base+1] & 0x0F}</span></div>
+                    <div class="cell"><span class="label">FINE</span><span class="val">${pcb[base+2]}</span></div>
+                    <div class="cell"><span class="label">WAVE</span><span class="val">${pcb[base]}</span></div>
+                    
+                    <div class="cell mod-row">MODS</div>
+                    <div class="cell mod-row" style="grid-column: span 2">
+                        <span class="label">MOD 1</span><span class="val">${MOD_SOURCES[pcb[modBase]]} * ${pcb[modBase+1]}</span>
+                    </div>
+                    <div class="cell mod-row" style="grid-column: span 2">
+                        <span class="label">MOD 2</span><span class="val">${MOD_SOURCES[pcb[modBase+2]]} * ${pcb[modBase+3]}</span>
+                    </div>
+                </div>
+            </div>`;
+        }
 
-            const params = [
-                { n: "OSC 1 Wave", v: patch.pcb[0] },
-                { n: "Filter Cutoff", v: patch.pcb[20] },
-                { n: "Filter Res", v: patch.pcb[21] },
-                { n: "AM / Mode", v: patch.pcb[22], d: (patch.pcb[22] & 0x40 ? "SQ80 2nd Rel ON" : "Standard") }
-            ];
+        function createFilterModule(pcb) {
+            return `
+            <div class="module">
+                <div class="module-header">FILTER</div>
+                <div class="param-grid">
+                    <div class="cell">MAIN</div>
+                    <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[20]}</span></div>
+                    <div class="cell"><span class="label">RES</span><span class="val">${pcb[21]}</span></div>
+                    <div class="cell"><span class="label">KEYBD</span><span class="val">${pcb[23]}</span></div>
+                    <div class="cell"><span class="label">MODE</span><span class="val">${pcb[22] & 0x40 ? '2ndREL' : 'STD'}</span></div>
+                    
+                    <div class="cell mod-row">MODS</div>
+                    <div class="cell mod-row" style="grid-column: span 2">
+                        <span class="label">MOD 1</span><span class="val">${MOD_SOURCES[pcb[24]]} * ${pcb[25]}</span>
+                    </div>
+                    <div class="cell mod-row" style="grid-column: span 2">
+                        <span class="label">MOD 2</span><span class="val">${MOD_SOURCES[pcb[26]]} * ${pcb[27]}</span>
+                    </div>
+                </div>
+            </div>`;
+        }
 
-            params.forEach(p => {
-                tbody.innerHTML += `<tr><td>${p.n}</td><td>${p.v}</td><td>${p.v.toString(16).toUpperCase()}</td><td>${p.d || ''}</td></tr>`;
-            });
+        function createEnvModule(title, pcb, base) {
+            return `
+            <div class="module">
+                <div class="module-header">${title} (${pcb[base] & 0x40 ? 'LINEAR' : 'EXP'})</div>
+                <div class="param-grid env-grid">
+                    <div class="cell">LEVEL</div>
+                    <div class="cell"><span class="label">L1</span><span class="val">${pcb[base] & 0x3F}</span></div>
+                    <div class="cell"><span class="label">L2</span><span class="val">${pcb[base+2]}</span></div>
+                    <div class="cell"><span class="label">L3</span><span class="val">${pcb[base+4]}</span></div>
+                    <div class="cell"><span class="label">LV</span><span class="val">${pcb[base+10]}</span></div>
+                    
+                    <div class="cell mod-row">TIME</div>
+                    <div class="cell mod-row"><span class="label">T1</span><span class="val">${pcb[base+1]}</span></div>
+                    <div class="cell mod-row"><span class="label">T2</span><span class="val">${pcb[base+3]}</span></div>
+                    <div class="cell mod-row"><span class="label">T3</span><span class="val">${pcb[base+5]}</span></div>
+                    <div class="cell mod-row"><span class="label">T4</span><span class="val">${pcb[base+6]}</span></div>
+                </div>
+            </div>`;
         }
     </script>
 </body>
