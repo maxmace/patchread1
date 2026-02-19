@@ -2,98 +2,171 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ensoniq SysEx Loader</title>
+    <title>Ensoniq SQ-80 / ESQ-1 Manager</title>
     <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2c2c2c; color: #e0e0e0; padding: 20px; }
         #drop-zone {
-            width: 100%;
-            height: 200px;
-            border: 3px dashed #4a4a4a;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f9f9f9;
-            cursor: pointer;
-            transition: 0.3s;
+            width: 100%; height: 120px; border: 2px dashed #666;
+            display: flex; align-items: center; justify-content: center;
+            background: #3d3d3d; cursor: pointer; margin-bottom: 20px;
         }
-        #drop-zone.hover { background: #e1f5fe; border-color: #03a9f4; }
-        .info { margin-top: 20px; font-family: monospace; }
+        #drop-zone.hover { background: #4a90e2; border-color: #fff; }
+        
+        /* Grid for Bank View */
+        .patch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px; margin-top: 20px;
+        }
+        .patch-item {
+            background: #444; padding: 10px; border-radius: 4px; cursor: pointer;
+            text-align: center; border: 1px solid #555; transition: 0.2s;
+        }
+        .patch-item:hover { background: #5a5a5a; border-color: #4a90e2; }
+        .patch-item.selected { background: #4a90e2; color: white; }
+        
+        .tag { font-size: 0.7rem; padding: 2px 5px; border-radius: 3px; margin-left: 5px; font-weight: bold; }
+        .tag-sq80 { background: #d4a017; color: black; }
+        .tag-esq1 { background: #27ae60; color: white; }
+
+        .editor-container { display: none; margin-top: 30px; border-top: 2px solid #555; padding-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #555; padding: 8px; text-align: left; }
+        th { background: #1a1a1a; }
     </style>
 </head>
 <body>
 
-    <h2>Ensoniq ESQ-1 / SQ-80 File Loader</h2>
+    <h2>Ensoniq Librarian & Editor</h2>
     
-    <div id="drop-zone">
-        Drag & Drop .SYX or .MDX files here (or click to select)
-    </div>
+    <div id="drop-zone">Drag & Drop .SYX or .MDX | Click to Browse</div>
     <input type="file" id="file-input" accept=".syx,.mdx" style="display: none;">
 
-    <div id="output" class="info"></div>
+    <div id="status-bar" class="info"></div>
+    <div id="patch-list" class="patch-grid"></div>
+
+    <div id="editor" class="editor-container">
+        <h3 id="current-patch-name">Patch Editor</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Value</th>
+                    <th>Hex</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody id="param-table-body">
+                </tbody>
+        </table>
+    </div>
 
     <script>
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
-        const output = document.getElementById('output');
+        const patchList = document.getElementById('patch-list');
+        const status = document.getElementById('status-bar');
 
-        // Click to open file picker
         dropZone.addEventListener('click', () => fileInput.click());
-
-        // Drag and Drop handlers
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('hover');
-        });
-
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('hover'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('hover');
-            handleFiles(e.dataTransfer.files);
-        });
-
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('hover'); handleFiles(e.dataTransfer.files); });
         fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
         function handleFiles(files) {
             const file = files[0];
             if (!file) return;
-
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const rawData = new Uint8Array(e.target.result);
-                analyzeSysEx(rawData, file.name);
-            };
+            reader.onload = (e) => processSysEx(new Uint8Array(e.target.result), file.name);
             reader.readAsArrayBuffer(file);
         }
 
-        function analyzeSysEx(data, filename) {
-            const size = data.length;
-            let type = "Unknown";
+        function unpackNibbles(data, start) {
+            let pcb = new Uint8Array(102);
+            for (let i = 0; i < 102; i++) {
+                pcb[i] = (data[start + (i * 2)] << 4) | (data[start + (i * 2) + 1] & 0x0F);
+            }
+            return pcb;
+        }
 
-            // Basic Ensoniq Check: MIDI Start (0xF0), Ensoniq ID (0x0F)
-            const isEnsoniq = (data[0] === 0xF0 && data[1] === 0x0F);
+        function detectModel(pcb) {
+            let sq80Markers = 0;
+            // 1. Check OSC waves > 31
+            [0, 5, 10].forEach(off => { if(pcb[off] > 31) sq80Markers++; });
+            // 2. Check AM 2nd Release (Bit 6)
+            if ((pcb[22] & 0x40)) sq80Markers++;
+            // 3. Check all 4 Envelopes for Linear mode (Bit 6)
+            [42, 54, 66, 78].forEach(off => { if(pcb[off] & 0x40) sq80Markers++; });
+            
+            return sq80Markers > 0 ? 'SQ80' : 'ESQ1';
+        }
 
-            if (!isEnsoniq) {
-                output.innerHTML = `⚠️ <strong>Error:</strong> File does not appear to be a valid Ensoniq SysEx message.`;
+        function processSysEx(data, filename) {
+            if (data[0] !== 0xF0 || data[1] !== 0x0F) {
+                alert("Not a valid Ensoniq SysEx file.");
                 return;
             }
 
-            // Simple logic to differentiate based on common Ensoniq sizes
-            // ESQ-1 single patches are ~102 bytes; Banks are ~4100+ bytes
-            if (size < 500) {
-                type = "Single Patch File";
-            } else if (size > 3000) {
-                type = "Bank File (40 Patches)";
+            patchList.innerHTML = '';
+            let patches = [];
+
+            // Single Patch (~200+ bytes) vs Bank (~8kb)
+            if (data.length < 500) {
+                const pcb = unpackNibbles(data, 10);
+                patches.push({ name: extractName(pcb), pcb: pcb });
+            } else {
+                let offset = 10; // Standard Ensoniq bank header offset
+                for (let i = 0; i < 40; i++) {
+                    const pcb = unpackNibbles(data, offset);
+                    patches.push({ name: extractName(pcb), pcb: pcb });
+                    offset += 204;
+                }
             }
 
-            output.innerHTML = `
-                <strong>File Name:</strong> ${filename}<br>
-                <strong>Size:</strong> ${size} bytes<br>
-                <strong>Detected Type:</strong> ${type}<br>
-                <strong>Hex Header:</strong> ${Array.from(data.slice(0, 5)).map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')}...
-            `;
+            renderGrid(patches);
+            status.innerHTML = `Loaded ${filename} (${patches.length} patches)`;
+        }
+
+        function extractName(pcb) {
+            return String.fromCharCode(...pcb.slice(94, 100)).trim() || "UNTITL";
+        }
+
+        function renderGrid(patches) {
+            patches.forEach((p, idx) => {
+                const model = detectModel(p.pcb);
+                const div = document.createElement('div');
+                div.className = 'patch-item';
+                div.innerHTML = `${p.name} <span class="tag tag-${model.toLowerCase()}">${model}</span>`;
+                div.onclick = () => loadPatchToEditor(p);
+                patchList.appendChild(div);
+            });
+        }
+
+        function loadPatchToEditor(patch) {
+            document.getElementById('editor').style.display = 'block';
+            document.getElementById('current-patch-name').innerText = `Editing: ${patch.name}`;
             
-            console.log("Raw Data:", data);
+            const tbody = document.getElementById('param-table-body');
+            tbody.innerHTML = '';
+
+            // Mapping a few key params for demonstration
+            const params = [
+                { name: "OSC 1 Wave", val: patch.pcb[0], off: 0 },
+                { name: "OSC 1 Semitone", val: patch.pcb[1], off: 1 },
+                { name: "Filter Cutoff", val: patch.pcb[20], off: 20 },
+                { name: "Filter Resonance", val: patch.pcb[21], off: 21 },
+                { name: "AM / 2nd Release", val: patch.pcb[22], off: 22, note: (patch.pcb[22] & 0x40 ? "2nd Rel ON" : "") }
+            ];
+
+            params.forEach(p => {
+                const row = `<tr>
+                    <td>${p.name}</td>
+                    <td>${p.val}</td>
+                    <td>0x${p.val.toString(16).toUpperCase()}</td>
+                    <td>${p.note || ''}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
         }
     </script>
 </body>
