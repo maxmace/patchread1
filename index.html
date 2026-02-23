@@ -15,7 +15,7 @@
             --sq80-fixed: #3498db;
             --sq80-prob: #1abc9c;
             --sq80-poss: #16a085;
-            --hidden-wave: #00d2ff; /* Unique Bright Blue for Hidden Waves */
+            --hidden-wave: #00d2ff;
             --glass: rgba(255, 255, 255, 0.03);
         }
 
@@ -54,7 +54,6 @@
             background: linear-gradient(to right, #1a1a1a, #121212);
         }
 
-        /* Detection Badges */
         .synth-type-badge {
             display: inline-block; margin-left: 15px; padding: 4px 12px; border-radius: 4px;
             font-size: 10px; font-weight: 800; text-transform: uppercase;
@@ -79,10 +78,19 @@
         .label { font-size: 9px; color: var(--label); text-transform: uppercase; margin-bottom: 2px; }
         .num { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
         
-        /* Specialized Mod Styling */
+        /* Centered Mod Logic */
         .mod-container { display: flex; align-items: center; justify-content: center; }
         .mod-src { color: #aaa; font-size: 11px; font-weight: 600; }
-        .mod-star { color: var(--label); font-size: 18px; font-weight: bold; padding: 0 12px; line-height: 0; }
+        .mod-star { 
+            color: var(--label); 
+            font-size: 20px; 
+            font-weight: bold; 
+            padding: 0 12px; 
+            line-height: 0;
+            display: inline-block;
+            transform: translateY(20%); /* Centering fix */
+            user-select: none;
+        }
         .mod-val { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: bold; }
 
         .wave-num { font-size: 9px; color: var(--accent); opacity: 0.8; font-weight: bold; }
@@ -123,7 +131,6 @@
 
         const toSigned = (val) => (val & 0x80) ? -(val ^ 0xFF) - 1 : Math.floor(val/2);
 
-        // Helper for mod rendering
         const renderMod = (label, srcIdx, val) => `
             <div class="cell">
                 <span class="label">${label}</span>
@@ -179,7 +186,11 @@
                     const div = document.createElement('div');
                     div.className = 'patch-item';
                     div.innerText = patches[idx].name;
-                    div.onclick = () => displayParameters(patches[idx]);
+                    div.onclick = () => {
+                        document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
+                        div.classList.add('selected');
+                        displayParameters(patches[idx]);
+                    };
                     list.appendChild(div);
                 }
             }
@@ -190,7 +201,6 @@
             document.getElementById('patch-name-display').innerText = patch.name;
             const pcb = patch.pcb;
 
-            // Detection Logic
             let hasHidden = (pcb[63] >= 74 || pcb[73] >= 74 || pcb[83] >= 74);
             let lvl1 = false, lvl2 = false, lvl3 = false;
             for(let e=0; e<4; e++) {
@@ -234,8 +244,7 @@
                             ${renderMod('MOD 1', pcb[base+2]&0x0F, pcb[base+3])}
                             ${renderMod('MOD 2', pcb[base+2]>>4, pcb[base+4])}
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }
 
             // ROW 2: DCAs
@@ -253,17 +262,34 @@
                             ${renderMod('MOD 1', pcb[base+1]&0x0F, pcb[base+2])}
                             ${renderMod('MOD 2', pcb[base+1]>>4, pcb[base+3])}
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }
 
-            // Row 3-5 Placeholders
-            for(let i=0; i<3; i++) db.innerHTML += `<div class="module span-4"><div class="module-header">LFO ${i+1}</div></div>`;
+            // ROW 3: LFOs
+            for(let i=1; i<=3; i++) {
+                let base = 36 + (i-1)*6; 
+                let lWaves = ["TRI", "SAW", "SQR", "NOI"];
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">LFO ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">FREQ</span><span class="num">${pcb[base]}</span></div>
+                            <div class="cell"><span class="label">WAVE</span><span class="wave-name">${lWaves[(pcb[base+1]>>2)&0x03]}</span></div>
+                            <div class="cell"><span class="label">RESET</span><span class="num">${(pcb[base+1]&0x01)?"ON":"OFF"}</span></div>
+                            <div class="cell"><span class="label">HUMAN</span><span class="num">${(pcb[base+1]&0x02)?"ON":"OFF"}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">DELAY</span><span class="num">${pcb[base+2]}</span></div>
+                            ${renderMod('MOD (LFO AMT)', pcb[base+3]&0x0F, pcb[base+4])}
+                        </div>
+                    </div>`;
+            }
+
+            // Row 4-5 Placeholders
             for(let i=0; i<4; i++) db.innerHTML += `<div class="module span-3"><div class="module-header">ENV ${i+1}</div></div>`;
             ['FILTER','MODES','SPLIT/LAYER','DCA 4'].forEach(t => db.innerHTML += `<div class="module span-3"><div class="module-header">${t}</div></div>`);
         }
 
-        // Drop Zone UI Helpers
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = (e) => handleFile(e.target.files[0]);
         window.addEventListener('dragover', e => e.preventDefault());
