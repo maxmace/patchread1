@@ -16,24 +16,27 @@
         
         #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #333; }
         
-        .tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; font-weight: bold; }
-        .tag-sq80 { background: var(--sq80); color: #000; }
-        .tag-esq1 { background: var(--esq1); color: #fff; }
-
-        /* Bank Layout */
-        .bank-container { margin-bottom: 20px; }
-        .bank-header { font-weight: bold; color: var(--accent); margin: 15px 0 5px 0; font-size: 0.9rem; letter-spacing: 1px; }
+        /* Compact 2x2 Bank Layout */
+        .bank-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .bank-container { background: #181818; padding: 10px; border-radius: 6px; border: 1px solid #333; }
+        .bank-header { font-weight: bold; color: var(--accent); margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        
         .patch-grid { 
             display: grid; 
             grid-template-columns: repeat(5, 1fr); 
-            gap: 8px; 
+            gap: 5px; 
         }
-        .patch-item { background: var(--panel); padding: 12px; border-radius: 4px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 1rem; }
+        .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; overflow: hidden; }
         .patch-item:hover { border-color: var(--accent); }
         .patch-item.selected { background: var(--accent); color: white; border-color: #fff; }
 
         /* Dashboard */
-        .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; display: none; margin-top: 30px; }
+        .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; display: none; margin-top: 20px; }
         .span-4 { grid-column: span 4; } 
         .span-3 { grid-column: span 3; }
         @media (max-width: 1000px) { .span-4, .span-3 { grid-column: span 12; } }
@@ -57,28 +60,22 @@
         <span id="model-badge"></span>
     </div>
 
-    <div id="patch-list"></div>
+    <div id="bank-view" class="bank-wrapper"></div>
     <div id="dashboard" class="dashboard"></div>
 
     <script>
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
-        const patchList = document.getElementById('patch-list');
+        const bankView = document.getElementById('bank-view');
         const dashboard = document.getElementById('dashboard');
         const fileInfo = document.getElementById('file-info');
-        const modelBadge = document.getElementById('model-badge');
 
         const MOD_SOURCES = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL2", "KYBD", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
         const LFO_WAVES = ["TRI", "SAW", "SQR", "NOISE", "RAND"];
 
-        // UI Event Listeners
         dropZone.onclick = () => fileInput.click();
-        dropZone.ondragover = (e) => { e.preventDefault(); e.stopPropagation(); };
-        dropZone.ondrop = (e) => { 
-            e.preventDefault(); 
-            e.stopPropagation(); 
-            handleFiles(e.dataTransfer.files); 
-        };
+        dropZone.ondragover = (e) => { e.preventDefault(); };
+        dropZone.ondrop = (e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); };
         fileInput.onchange = (e) => handleFiles(e.target.files);
 
         function handleFiles(files) {
@@ -89,57 +86,74 @@
             reader.readAsArrayBuffer(file);
         }
 
+        /**
+         * Ensoniq SQ-80 Data Unpacking
+         * Data is typically stored as:
+         * Byte 0: 0000llll (Low Nibble)
+         * Byte 1: 0000hhhh (High Nibble)
+         * Result: hhhhllll
+         */
         function unpackNibbles(data, start) {
             let pcb = new Uint8Array(102);
             for (let i = 0; i < 102; i++) {
-                // SQ-80 SysEx: Low Nibble first (0000yyyy), then High Nibble (0000xxxx)
-                // If text is still garbled, swap data indices to [start+(i*2)] for high
-                pcb[i] = ((data[start + (i * 2) + 1] & 0x0F) << 4) | (data[start + (i * 2)] & 0x0F);
+                let low = data[start + (i * 2)] & 0x0F;
+                let high = data[start + (i * 2) + 1] & 0x0F;
+                pcb[i] = (high << 4) | low;
             }
             return pcb;
         }
 
         function extractName(pcb) {
             let name = "";
+            // Patch name is bytes 94-99
             for(let i=94; i<100; i++) {
                 let charCode = pcb[i] & 0x7F; 
-                name += (charCode >= 32 && charCode <= 126) ? String.fromCharCode(charCode) : " ";
+                // Filter out non-printable ASCII
+                if (charCode >= 32 && charCode <= 126) {
+                    name += String.fromCharCode(charCode);
+                } else {
+                    name += " ";
+                }
             }
             return name.trim() || "UNTITL";
         }
 
         function processSysEx(data, filename) {
-            if (data[0] !== 0xF0) return alert("Invalid SysEx Header");
+            // Basic SysEx check (F0 0F ...)
+            if (data[0] !== 0xF0) return alert("Not a valid SysEx file.");
             
-            patchList.innerHTML = '';
+            bankView.innerHTML = '';
             dashboard.style.display = 'none';
             let patches = [];
 
-            // Detect if Single (short) or Bank (long)
-            if (data.length < 500) {
-                patches.push({ pcb: unpackNibbles(data, 10), name: "" });
-                patches[0].name = extractName(patches[0].pcb);
-            } else {
+            // A bank of 40 patches (204 bytes per nibbled patch) 
+            // starts at offset 10 in standard Ensoniq dumps
+            if (data.length > 1000) {
                 for (let i = 0; i < 40; i++) {
                     const offset = 10 + (i * 204);
                     const pcb = unpackNibbles(data, offset);
                     patches.push({ pcb: pcb, name: extractName(pcb) });
                 }
+            } else {
+                // Single patch mode
+                const pcb = unpackNibbles(data, 10);
+                patches.push({ pcb: pcb, name: extractName(pcb) });
             }
 
-            fileInfo.innerText = `${filename} (${patches.length} Patches)`;
-            renderPatchGrid(patches);
+            fileInfo.innerText = `${filename} - ${patches.length} Patch(es)`;
+            renderBankView(patches);
         }
 
-        function renderPatchGrid(patches) {
+        function renderBankView(patches) {
             if (patches.length === 1) {
-                const item = createPatchElement(patches[0]);
-                patchList.appendChild(item);
-                item.click();
+                const soloContainer = document.createElement('div');
+                soloContainer.className = 'bank-container';
+                soloContainer.style.gridColumn = "span 2";
+                soloContainer.appendChild(createPatchElement(patches[0]));
+                bankView.appendChild(soloContainer);
                 return;
             }
 
-            // Create 4 Banks of 10 (2 rows of 5)
             for (let b = 0; b < 4; b++) {
                 const bankDiv = document.createElement('div');
                 bankDiv.className = 'bank-container';
@@ -149,33 +163,34 @@
                 grid.className = 'patch-grid';
                 
                 for (let p = 0; p < 10; p++) {
-                    const patchIdx = (b * 10) + p;
-                    if (patches[patchIdx]) {
-                        grid.appendChild(createPatchElement(patches[patchIdx]));
+                    const idx = (b * 10) + p;
+                    if (patches[idx]) {
+                        grid.appendChild(createPatchElement(patches[idx]));
                     }
                 }
                 bankDiv.appendChild(grid);
-                patchList.appendChild(bankDiv);
+                bankView.appendChild(bankDiv);
             }
         }
 
-        function createPatchElement(patchObj) {
+        function createPatchElement(patch) {
             const div = document.createElement('div');
             div.className = 'patch-item';
-            div.innerText = patchObj.name;
+            div.innerText = patch.name;
             div.onclick = () => {
                 document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
                 div.classList.add('selected');
-                drawDashboard(patchObj.pcb, patchObj.name);
+                drawDashboard(patch.pcb, patch.name);
             };
             return div;
         }
 
+        // Module Creation Functions (Osc, DCA, LFO, etc.)
         function drawDashboard(pcb, name) {
             dashboard.style.display = 'grid';
             dashboard.innerHTML = '';
 
-            // ROW 1-3 (3 cols)
+            // Layout as requested: 3x3 then 2x4
             dashboard.innerHTML += createOscModule("OSCILLATOR 1", pcb, 0, 12, "span-4");
             dashboard.innerHTML += createOscModule("OSCILLATOR 2", pcb, 5, 16, "span-4");
             dashboard.innerHTML += createOscModule("OSCILLATOR 3", pcb, 10, 20, "span-4");
@@ -188,7 +203,6 @@
             dashboard.innerHTML += createLFOModule("LFO 2", pcb, 32, "span-4");
             dashboard.innerHTML += createLFOModule("LFO 3", pcb, 36, "span-4");
 
-            // ROW 4-5 (4 cols)
             dashboard.innerHTML += createEnvModule("ENVELOPE 1", pcb, 42, "span-3");
             dashboard.innerHTML += createEnvModule("ENVELOPE 2", pcb, 54, "span-3");
             dashboard.innerHTML += createEnvModule("ENVELOPE 3", pcb, 66, "span-3");
@@ -197,7 +211,7 @@
             dashboard.innerHTML += createFilterModule(pcb, "span-3");
             dashboard.innerHTML += createModesModule(pcb, "span-3");
             dashboard.innerHTML += createSplitModule(pcb, "span-3");
-            dashboard.innerHTML += createDCAModule("DCA 4", pcb, 90, "span-3");
+            dashboard.innerHTML += createDCAModule("DCA 4 (FINAL)", pcb, 90, "span-3");
         }
 
         function createOscModule(title, pcb, b, m, span) {
@@ -207,7 +221,8 @@
                     <div class="cell"><span class="label">OCT</span><span class="val">${((pcb[b+1] >> 4) & 0x0F) - 3}</span></div>
                     <div class="cell"><span class="label">SEMI</span><span class="val">${pcb[b+1] & 0x0F}</span></div>
                     <div class="cell" style="grid-column:span 2"><span class="label">FINE</span><span class="val">${pcb[b+2]}</span></div>
-                    <div class="cell mod-row">MODS</div><div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m]]}</span><span class="val">${(pcb[m+1] << 24 >> 24)}</span></div>
+                    <div class="cell mod-row">MODS</div>
+                    <div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m]]}</span><span class="val">${(pcb[m+1] << 24 >> 24)}</span></div>
                     <div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m+2]]}</span><span class="val">${(pcb[m+3] << 24 >> 24)}</span></div>
                 </div></div>`;
         }
@@ -216,7 +231,8 @@
             return `<div class="module ${span}"><div class="module-header">${title}</div>
                 <div class="param-grid">
                     <div class="cell">LVL</div><div class="cell" style="grid-column:span 4"><span class="val">${pcb[b]}</span></div>
-                    <div class="cell mod-row">MOD</div><div class="cell mod-row" style="grid-column:span 2"><span class="label">SRC</span><span class="val">${MOD_SOURCES[pcb[b+1]]}</span></div>
+                    <div class="cell mod-row">MOD</div>
+                    <div class="cell mod-row" style="grid-column:span 2"><span class="label">SRC</span><span class="val">${MOD_SOURCES[pcb[b+1]]}</span></div>
                     <div class="cell mod-row" style="grid-column:span 2"><span class="label">AMT</span><span class="val">${(pcb[b+2] << 24 >> 24)}</span></div>
                 </div></div>`;
         }
@@ -228,7 +244,7 @@
                     <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[b]}</span></div>
                     <div class="cell"><span class="label">WAVE</span><span class="val">${humanWave}</span></div>
                     <div class="cell"><span class="label">DLY</span><span class="val">${pcb[b+3]}</span></div>
-                    <div class="cell"><span class="label">LFO MOD</span><span class="val">${pcb[b+1]}</span></div>
+                    <div class="cell"><span class="label">MOD</span><span class="val">${pcb[b+1]}</span></div>
                     <div class="cell"><span class="label">RST</span><span class="val">${(pcb[b+2] & 0x80) ? 'ON' : 'OFF'}</span></div>
                 </div></div>`;
         }
