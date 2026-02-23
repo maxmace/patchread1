@@ -2,46 +2,141 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ensoniq SQ-80 Librarian (Legacy-Corrected)</title>
+    <title>Ensoniq SQ-80 Patch Librarian</title>
     <style>
-        :root { --bg: #0f0f0f; --panel: #1a1a1a; --accent: #e74c3c; --text: #dcdcdc; }
-        body { font-family: 'Courier New', monospace; background: var(--bg); color: var(--text); padding: 20px; }
-        #drop-zone { width: 100%; height: 50px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; color: var(--accent); font-weight: bold; margin-bottom: 20px; }
-        .patch-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-bottom: 20px; }
-        .patch-item { background: #222; padding: 10px 5px; text-align: center; border: 1px solid #333; cursor: pointer; font-size: 0.8rem; }
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --accent: #f39c12;
+            --text: #e0e0e0;
+            --label: #888;
+            --value: #5dade2;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        #drop-zone {
+            width: 100%;
+            height: 80px;
+            border: 2px dashed #444;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--panel);
+            cursor: pointer;
+            color: var(--accent);
+            text-align: center;
+            margin-bottom: 20px;
+            transition: 0.3s;
+        }
+
+        #drop-zone:hover { border-color: var(--accent); background: #252525; }
+
+        /* Bank Grid */
+        .patch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 8px;
+            margin-bottom: 30px;
+        }
+
+        .patch-item {
+            background: #2a2a2a;
+            padding: 12px 5px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid #333;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
         .patch-item:hover { border-color: var(--accent); }
-        .patch-item.selected { background: var(--accent); color: white; }
-        
-        .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border-top: 2px solid #444; padding-top: 20px; }
-        .module { background: #111; border: 1px solid #333; padding: 10px; }
-        .module-header { color: var(--accent); font-size: 0.7rem; margin-bottom: 8px; border-bottom: 1px solid #333; }
-        .val-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px; }
-        .label { color: #777; }
-        .num { color: #00ff00; }
+        .patch-item.selected { background: var(--accent); color: #000; font-weight: bold; }
+
+        /* Dashboard Layout */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .module {
+            background: var(--panel);
+            border-radius: 6px;
+            padding: 12px;
+            border: 1px solid #333;
+        }
+
+        .module-header {
+            color: var(--accent);
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .val-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+        }
+
+        .label { color: var(--label); }
+        .num { color: var(--value); font-family: 'Consolas', monospace; }
+
+        h2 { color: var(--accent); margin-top: 0; }
     </style>
 </head>
 <body>
 
-    <div id="drop-zone">LOAD SQ-80 SYSEX (OFFSET 5 MODE)</div>
+    <div id="drop-zone">Drop ESQ/SQ-80 System Exclusive files here. <br>Click to load manually via file selector.</div>
     <input type="file" id="file-input" style="display: none;">
+
+    <h2 id="current-patch-display">Bank View</h2>
     <div id="bank-view" class="patch-grid"></div>
+
     <div id="dashboard" class="dashboard"></div>
 
     <script>
-        const MODS = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL-X", "KBD", "KBD2", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
-        const WAVES = ["SAW","BELL","SINE","SQUARE","PULSE","NOISE1","NOISE2","NOISE3","BASS","PIANO","ELPNO","VOICE1","VOICE2","KICK","REED","ORGAN"]; // Truncated for example
+        const MODS = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL-X", "KBD", "KBD2", "WHEEL", "PEDAL", "XCTRL", "PRESS", "*OFF*"];
         
         let patches = [];
 
-        document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
-        document.getElementById('file-input').onchange = (e) => {
+        // File Handling
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.onclick = () => fileInput.click();
+        
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
             const reader = new FileReader();
             reader.onload = (ev) => process(new Uint8Array(ev.target.result));
-            reader.readAsArrayBuffer(e.target.files[0]);
+            reader.readAsArrayBuffer(file);
         };
 
+        // Logic for Twos-Complement Signed Values (as seen in your neg63 function)
+        function toSigned(val) {
+            let out = (val & 0x80) ? -(val ^ 0xFF) - 1 : val;
+            return out >> 1;
+        }
+
         function process(data) {
-            // THE PHP LOGIC: Start at byte 5, denibble LSN-first
+            // Your PHP offset 5 logic
             let unpacked = [];
             for (let i = 5; i < data.length - 1; i += 2) {
                 unpacked.push(((data[i+1] & 0x0F) << 4) | (data[i] & 0x0F));
@@ -49,60 +144,113 @@
 
             patches = [];
             const pcbSize = 102;
-            for (let i = 0; i < Math.floor(unpacked.length / pcbSize); i++) {
+            const patchCount = Math.floor(unpacked.length / pcbSize);
+
+            for (let i = 0; i < patchCount; i++) {
                 let pcb = unpacked.slice(i * pcbSize, (i + 1) * pcbSize);
-                // Name is at offset 0-5 per your PHP script
+                // Name extraction from start of PCB
                 let name = "";
-                for(let n=0; n<6; n++) name += String.fromCharCode(pcb[n] & 0x7F);
-                patches.push({ name: name.replace(/[^a-zA-Z0-9\s]/g, ""), pcb: pcb });
+                for(let n=0; n<6; n++) {
+                    name += String.fromCharCode(pcb[n] & 0x7F);
+                }
+                patches.push({ 
+                    name: name.replace(/[^a-zA-Z0-9\s]/g, ""), 
+                    pcb: pcb 
+                });
             }
-            render();
+            renderBank();
         }
 
-        function render() {
+        function renderBank() {
             const view = document.getElementById('bank-view');
             view.innerHTML = '';
             patches.forEach((p, i) => {
                 const div = document.createElement('div');
                 div.className = 'patch-item';
-                div.innerText = `${i+1}: ${p.name}`;
+                div.innerText = `${i+1}: ${p.name || '---'}`;
                 div.onclick = () => {
                     document.querySelectorAll('.patch-item').forEach(el=>el.classList.remove('selected'));
                     div.classList.add('selected');
-                    draw(p.pcb);
+                    displayParameters(p);
                 };
                 view.appendChild(div);
             });
         }
 
-        function draw(pcb) {
+        function displayParameters(patch) {
+            const pcb = patch.pcb;
             const db = document.getElementById('dashboard');
+            document.getElementById('current-patch-display').innerText = `Patch: ${patch.name}`;
             db.innerHTML = '';
-            
-            // OSCILLATORS (Based on PHP: Offset 6 + 40 + 12 + osc*10)
+
+            // OSCILLATORS 1-3
             for(let i=0; i<3; i++) {
                 let base = 6 + 40 + 12 + (i * 10);
                 let semi = pcb[base] & 0x7F;
+                let mod_bits = pcb[base + 2];
+                
                 db.innerHTML += `
                     <div class="module">
-                        <div class="module-header">OSC ${i+1}</div>
+                        <div class="module-header">OSCILLATOR ${i+1}</div>
                         <div class="val-row"><span class="label">OCT</span><span class="num">${Math.floor(semi/12)-3}</span></div>
                         <div class="val-row"><span class="label">SEMI</span><span class="num">${semi%12}</span></div>
+                        <div class="val-row"><span class="label">FINE</span><span class="num">${pcb[base+1]/8}</span></div>
                         <div class="val-row"><span class="label">WAVE</span><span class="num">${pcb[base+5]}</span></div>
-                        <div class="val-row"><span class="label">MOD1</span><span class="num">${MODS[pcb[base+2] & 0x0F]}</span></div>
+                        <div class="val-row"><span class="label">MOD1 SRC</span><span class="num">${MODS[mod_bits & 0x0F]}</span></div>
+                        <div class="val-row"><span class="label">MOD1 AMT</span><span class="num">${toSigned(pcb[base+3])}</span></div>
                     </div>
                 `;
             }
 
-            // FILTER (Based on PHP: Offset 89, 90, 94)
+            // FILTER
             db.innerHTML += `
                 <div class="module">
                     <div class="module-header">FILTER</div>
                     <div class="val-row"><span class="label">FREQ</span><span class="num">${pcb[89] & 0x3F}</span></div>
                     <div class="val-row"><span class="label">RES</span><span class="num">${pcb[90] & 0x1F}</span></div>
                     <div class="val-row"><span class="label">KBD</span><span class="num">${(pcb[94] >> 1) & 0x3F}</span></div>
+                    <div class="val-row"><span class="label">MOD1 SRC</span><span class="num">${MODS[pcb[91] & 0x0F]}</span></div>
+                    <div class="val-row"><span class="label">MOD1 AMT</span><span class="num">${toSigned(pcb[93] << 1)}</span></div>
                 </div>
             `;
+
+            // DCAs 1-3
+            for(let i=0; i<3; i++) {
+                let base = 6 + 40 + 12 + (i * 10);
+                let dca_val = pcb[base + 6];
+                let mod_bits = pcb[base + 7];
+                db.innerHTML += `
+                    <div class="module">
+                        <div class="module-header">DCA ${i+1}</div>
+                        <div class="val-row"><span class="label">LEVEL</span><span class="num">${(dca_val >> 1) & 0x3F}</span></div>
+                        <div class="val-row"><span class="label">ENABLE</span><span class="num">${(dca_val >> 7 === 1) ? 'ON' : 'OFF'}</span></div>
+                        <div class="val-row"><span class="label">MOD1 SRC</span><span class="num">${MODS[mod_bits & 0x0F]}</span></div>
+                        <div class="val-row"><span class="label">MOD1 AMT</span><span class="num">${toSigned(pcb[base+8])}</span></div>
+                    </div>
+                `;
+            }
+
+            // DCA 4 & PAN
+            db.innerHTML += `
+                <div class="module">
+                    <div class="module-header">DCA 4 / PAN</div>
+                    <div class="val-row"><span class="label">ENV4 DEPTH</span><span class="num">${pcb[88]/2}</span></div>
+                    <div class="val-row"><span class="label">PAN</span><span class="num">${pcb[100] >> 4}</span></div>
+                    <div class="val-row"><span class="label">PAN MOD</span><span class="num">${MODS[pcb[100] & 0x0F]}</span></div>
+                </div>
+            `;
+
+            // ENVELOPES 1-4
+            for(let i=0; i<4; i++) {
+                let base = 6 + (i * 10);
+                db.innerHTML += `
+                    <div class="module">
+                        <div class="module-header">ENVELOPE ${i+1}</div>
+                        <div class="val-row"><span class="label">L1 / L2</span><span class="num">${toSigned(pcb[base])} / ${toSigned(pcb[base+1])}</span></div>
+                        <div class="val-row"><span class="label">T1 / T2</span><span class="num">${pcb[base+3]} / ${pcb[base+4]}</span></div>
+                    </div>
+                `;
+            }
         }
     </script>
 </body>
