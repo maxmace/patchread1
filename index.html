@@ -2,19 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ensoniq SQ-80 Librarian</title>
+    <title>Ensoniq SQ-80 Librarian (Debug Mode)</title>
     <style>
         :root { --bg: #121212; --panel: #1e1e1e; --module: #2a2a2a; --accent: #0078d4; --text: #e0e0e0; --label: #888; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; font-weight: bold; color: var(--accent); }
-        #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-bottom: 2px solid #333; display: flex; justify-content: space-between; }
         
+        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; font-weight: bold; color: var(--accent); }
+        
+        #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-bottom: 2px solid #333; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+        
+        .offset-controls { display: flex; align-items: center; gap: 10px; background: #000; padding: 5px 15px; border-radius: 4px; border: 1px solid #444; }
+        input[type=number] { background: #222; color: #0f0; border: 1px solid #444; padding: 4px; width: 50px; font-family: monospace; }
+
         .bank-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .bank-container { background: #181818; padding: 12px; border-radius: 6px; border: 1px solid #333; }
         .bank-header { font-weight: bold; color: var(--accent); margin-bottom: 10px; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .patch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
         .patch-item { background: var(--panel); padding: 10px 4px; border-radius: 4px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; }
-        .patch-item:hover { border-color: #555; }
         .patch-item.selected { background: var(--accent); color: white; border-color: #fff; }
 
         .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; margin-top: 25px; display: none; }
@@ -30,44 +34,45 @@
 </head>
 <body>
 
-    <div id="drop-zone">DROP SQ-80 SYSEX (.SYX)</div>
-    <input type="file" id="file-input" style="display: none;">
-    <div id="status-bar"><span id="file-info">Ready</span><span id="patch-count-badge"></span></div>
+    <div id="drop-zone">DROP SQ-80 SYSEX</div>
+    
+    <div id="status-bar">
+        <div id="file-info">Ready</div>
+        <div class="offset-controls">
+            <span class="label">START BYTE OFFSET:</span>
+            <input type="number" id="offset-input" value="10">
+            <span style="font-size: 10px; color: #666;">(Try 4, 5, 10, or 11)</span>
+        </div>
+    </div>
 
+    <input type="file" id="file-input" style="display: none;">
     <div id="bank-view" class="bank-wrapper"></div>
     <div id="dashboard" class="dashboard"></div>
 
     <script>
         const MOD_SOURCES = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL2", "KYBD", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
+        let currentRawData = null;
 
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = (e) => handleFiles(e.target.files);
+        document.getElementById('offset-input').oninput = () => { if(currentRawData) processSysEx(currentRawData); };
+        
         window.addEventListener("dragover", e => e.preventDefault());
         window.addEventListener("drop", e => { e.preventDefault(); handleFiles(e.dataTransfer.files); });
 
         function handleFiles(files) {
-            const file = files[0];
-            if (!file) return;
             const reader = new FileReader();
-            reader.onload = (e) => processSysEx(new Uint8Array(e.target.result), file.name);
-            reader.readAsArrayBuffer(file);
+            reader.onload = (e) => {
+                currentRawData = new Uint8Array(e.target.result);
+                processSysEx(currentRawData);
+            };
+            reader.readAsArrayBuffer(files[0]);
         }
 
-        function unpackSQ80(data) {
+        function unpack(data, startByte) {
             let unpacked = [];
-            let start = 0;
-            // Search for Ensoniq ID (0F) and SQ80 ID (03)
-            for(let i = 0; i < 10; i++) {
-                if(data[i] === 0x0F && data[i+1] === 0x03) {
-                    start = i + 3; // Command byte is usually 4th, data starts 5th
-                    break;
-                }
-            }
-            if (start === 0) start = 5; // Fallback to your PHP offset
-
-            // LSN-first denibbling per Chris Wareham
-            for (let i = start; i < data.length - 1; i += 2) {
-                if (data[i] === 0xF7) break; 
+            for (let i = startByte; i < data.length - 1; i += 2) {
+                if (data[i] === 0xF7) break;
                 let low = data[i] & 0x0F;
                 let high = data[i+1] & 0x0F;
                 unpacked.push((high << 4) | low);
@@ -84,22 +89,20 @@
             return name.trim();
         }
 
-        function processSysEx(data, filename) {
+        function processSysEx(data) {
             const bankView = document.getElementById('bank-view');
+            const offset = parseInt(document.getElementById('offset-input').value);
             bankView.innerHTML = '';
             document.getElementById('dashboard').style.display = 'none';
 
-            const fullBuffer = unpackSQ80(data);
+            const fullBuffer = unpack(data, offset);
             let patches = [];
-            const patchSize = 102;
-            const count = Math.floor(fullBuffer.length / patchSize);
+            const count = Math.floor(fullBuffer.length / 102);
 
             for (let i = 0; i < count; i++) {
-                let pcb = fullBuffer.slice(i * patchSize, (i + 1) * patchSize);
-                patches.push({ pcb, name: extractName(pcb) || "UNTITL" });
+                let pcb = fullBuffer.slice(i * 102, (i + 1) * 102);
+                patches.push({ pcb, name: extractName(pcb) || "???" });
             }
-
-            document.getElementById('file-info').innerText = filename;
             renderView(patches, count > 1);
         }
 
@@ -138,7 +141,7 @@
             db.style.display = 'grid';
             db.innerHTML = '';
             
-            // OSCILLATORS (1-3)
+            // OSCILLATORS (Standard Packing)
             for(let i=1; i<=3; i++) {
                 let b = (i-1)*5; let m = 12 + (i-1)*4;
                 db.innerHTML += `<div class="module span-4"><div class="module-header">OSC ${i}</div><div class="param-grid">
@@ -149,16 +152,19 @@
                 </div></div>`;
             }
 
-            // DCAs (1-3)
+            // LFOs (Corrected Stuartkeith Errata)
             for(let i=1; i<=3; i++) {
-                let b = 14 + (i-1)*4;
-                db.innerHTML += `<div class="module span-4"><div class="module-header">DCA ${i}</div><div class="param-grid">
-                    <div class="cell">LVL</div><div class="cell" style="grid-column:span 4"><span class="val">${pcb[b]}</span></div>
-                    <div class="cell mod-row" style="grid-column:span 5"><span class="label">MOD</span><span class="val">${MOD_SOURCES[pcb[b+1]]} (${pcb[b+2] << 24 >> 24})</span></div>
+                let b = 28 + (i-1)*4; 
+                // Manual errata fix: W0/W1 is actually Freq
+                db.innerHTML += `<div class="module span-4"><div class="module-header">LFO ${i}</div><div class="param-grid">
+                    <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[b]}</span></div>
+                    <div class="cell"><span class="label">MOD</span><span class="val">${pcb[b+1]}</span></div>
+                    <div class="cell"><span class="label">WAVE</span><span class="val">${pcb[b+2] & 7}</span></div>
+                    <div class="cell"><span class="label">DLY</span><span class="val">${pcb[b+3]}</span></div>
                 </div></div>`;
             }
 
-            // ENVELOPES (1-4)
+            // ENVELOPES
             for(let i=1; i<=4; i++) {
                 let b = 42 + (i-1)*12;
                 db.innerHTML += `<div class="module span-3"><div class="module-header">ENV ${i}</div><div class="param-grid">
@@ -166,20 +172,16 @@
                     <div class="cell"><span class="label">T1</span><span class="val">${pcb[b+1]}</span></div>
                     <div class="cell"><span class="label">L2</span><span class="val">${pcb[b+2]}</span></div>
                     <div class="cell"><span class="label">T2</span><span class="val">${pcb[b+3]}</span></div>
+                    <div class="cell"><span class="label">L3</span><span class="val">${pcb[b+4]}</span></div>
+                    <div class="cell"><span class="label">T3</span><span class="val">${pcb[b+5]}</span></div>
                 </div></div>`;
             }
 
-            // FILTER & MODES
-            db.innerHTML += `<div class="module span-6"><div class="module-header">FILTER</div><div class="param-grid">
+            // FILTER
+            db.innerHTML += `<div class="module span-12"><div class="module-header">FILTER</div><div class="param-grid">
                 <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[20]}</span></div>
                 <div class="cell"><span class="label">RES</span><span class="val">${pcb[21]}</span></div>
-                <div class="cell mod-row" style="grid-column:span 5"><span class="label">MOD 1</span><span class="val">${MOD_SOURCES[pcb[24]]} (${pcb[25] << 24 >> 24})</span></div>
-            </div></div>`;
-            db.innerHTML += `<div class="module span-6"><div class="module-header">MODES</div><div class="param-grid">
-                <div class="cell"><span class="label">GLIDE</span><span class="val">${pcb[41]}</span></div>
-                <div class="cell"><span class="label">VC-SYNC</span><span class="val">${(pcb[40] & 1) ? 'ON' : 'OFF'}</span></div>
-                <div class="cell"><span class="label">AM</span><span class="val">${(pcb[40] & 2) ? 'ON' : 'OFF'}</span></div>
-                <div class="cell"><span class="label">MONO</span><span class="val">${(pcb[40] & 4) ? 'ON' : 'OFF'}</span></div>
+                <div class="cell"><span class="label">KYBD</span><span class="val">${pcb[23]}</span></div>
             </div></div>`;
         }
     </script>
