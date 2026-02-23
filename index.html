@@ -6,7 +6,7 @@
     <style>
         :root { --bg: #121212; --panel: #1e1e1e; --module: #2a2a2a; --accent: #0078d4; --text: #e0e0e0; --label: #888; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        #drop-zone { width: 100%; height: 80px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; font-weight: bold; }
+        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; }
         #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-bottom: 2px solid #333; }
         .bank-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .bank-container { background: #181818; padding: 10px; border-radius: 6px; border: 1px solid #333; }
@@ -14,8 +14,9 @@
         .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; }
         .patch-item.selected { background: var(--accent); color: white; }
         .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; margin-top: 20px; display: none; }
-        .module { background: var(--module); border-radius: 6px; border: 1px solid #444; padding: 10px; }
-        #debug-log { background: #000; color: #0f0; font-family: monospace; padding: 10px; font-size: 10px; margin-top: 20px; border: 1px solid #333; height: 100px; overflow-y: auto; white-space: pre-wrap; }
+        .module { background: var(--module); border-radius: 6px; border: 1px solid #444; padding: 10px; grid-column: span 4; }
+        .label { color: var(--label); font-size: 0.6rem; display: block; }
+        .val { color: #fff; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -27,61 +28,49 @@
 
     <div id="bank-view" class="bank-wrapper"></div>
     <div id="dashboard" class="dashboard"></div>
-    
-    <div style="color: #888; font-size: 12px; margin-top: 20px;">RAW DATA DEBUG (FIRST 200 BYTES):</div>
-    <div id="debug-log">No data loaded yet.</div>
 
     <script>
-        const dropZone = document.getElementById('drop-zone');
-        const debugLog = document.getElementById('debug-log');
-
-        // Global for console access
-        window.rawSysExData = null;
-
-        dropZone.onclick = () => document.getElementById('file-input').click();
+        document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = (e) => handleFiles(e.target.files);
-        
-        window.addEventListener("dragover", e => { e.preventDefault(); dropZone.style.borderColor = "#0078d4"; });
-        window.addEventListener("dragleave", e => { e.preventDefault(); dropZone.style.borderColor = "#444"; });
-        window.addEventListener("drop", e => { 
-            e.preventDefault(); 
-            dropZone.style.borderColor = "#444";
-            handleFiles(e.dataTransfer.files); 
-        });
+        window.addEventListener("dragover", e => e.preventDefault());
+        window.addEventListener("drop", e => { e.preventDefault(); handleFiles(e.dataTransfer.files); });
 
         function handleFiles(files) {
             const file = files[0];
             if (!file) return;
-            
             const reader = new FileReader();
-            reader.onload = (e) => {
-                const arr = new Uint8Array(e.target.result);
-                window.rawSysExData = arr; // Force set global
-                
-                // Show raw bytes in the debug window immediately
-                debugLog.innerText = Array.from(arr.slice(0, 210)).join(', ');
-                
-                processSysEx(arr, file.name);
-            };
+            reader.onload = (e) => processSysEx(new Uint8Array(e.target.result), file.name);
             reader.readAsArrayBuffer(file);
         }
 
-        function unpackSQ80(data, start) {
-            let pcb = new Uint8Array(102);
-            // We use the "High Nibble Second" approach
-            for (let i = 0; i < 102; i++) {
-                let offset = start + (i * 2);
-                if (offset + 1 >= data.length) break;
-                pcb[i] = (data[offset] & 0x0F) | ((data[offset+1] & 0x0F) << 4);
+        /**
+         * Ensoniq 7-to-8 bit Unpacker
+         * Converts MIDI 7-bit data into internal 8-bit bytes
+         */
+        function unpack7to8(midiData) {
+            let unpacked = [];
+            for (let i = 0; i < midiData.length; i += 8) {
+                let chunk = midiData.slice(i, i + 8);
+                if (chunk.length < 2) break;
+                
+                // The first 7 bytes contain the lower 7 bits
+                // The 8th byte contains the high bits for the previous 7 bytes
+                let highBits = chunk[7]; 
+                for (let j = 0; j < 7; j++) {
+                    if (i + j >= midiData.length || j >= chunk.length - 1) break;
+                    let high = (highBits >> j) & 0x01;
+                    unpacked.push(chunk[j] | (high << 7));
+                }
             }
-            return pcb;
+            return new Uint8Array(unpacked);
         }
 
         function extractName(pcb) {
             let name = "";
+            // In the 102-byte internal record, name is bytes 94-100
             for(let i=94; i<100; i++) {
                 let c = pcb[i] & 0x7F;
-                name += (c >= 32 && c <= 126) ? String.fromCharCode(c) : "?";
+                name += (c >= 32 && c <= 126) ? String.fromCharCode(c) : " ";
             }
             return name.trim();
         }
@@ -91,23 +80,26 @@
             bankView.innerHTML = '';
             document.getElementById('dashboard').style.display = 'none';
 
+            // Remove F0 (240) and F7 (247) and header (next 8 bytes)
+            // Header: 15, 2, 0, 1, 6, 4, 9, 4 (From your raw dump)
+            const rawBody = data.slice(10, data.length - 1);
+            const pcbData = unpack7to8(rawBody);
+
             let patches = [];
-            const isBank = data.length > 500;
-            const count = isBank ? 40 : 1;
-            const headerSize = 10; // F0 0F 03 00 00 00 00 00 00 00
+            const patchSize = 102; 
+            const count = Math.floor(pcbData.length / patchSize);
 
             for (let i = 0; i < count; i++) {
-                const offset = headerSize + (i * 204);
-                const pcb = unpackSQ80(data, offset);
+                let pcb = pcbData.slice(i * patchSize, (i + 1) * patchSize);
                 patches.push({ pcb, name: extractName(pcb) });
             }
 
-            document.getElementById('file-info').innerText = `${filename} - Found ${patches.length} patch(es)`;
+            document.getElementById('file-info').innerText = `${filename} (${patches.length} patch/es)`;
             
-            patches.forEach((p, idx) => {
+            patches.forEach((p) => {
                 const div = document.createElement('div');
                 div.className = 'patch-item';
-                div.innerText = p.name;
+                div.innerText = p.name || "UNTITL";
                 div.onclick = () => {
                     document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
                     div.classList.add('selected');
@@ -120,9 +112,20 @@
         function showDashboard(pcb) {
             const db = document.getElementById('dashboard');
             db.style.display = 'grid';
-            db.innerHTML = `<div class="module" style="grid-column: span 12;">
-                <strong>PATCH NAME DATA:</strong> ${pcb.slice(94,100).join(' - ')}
-            </div>`;
+            db.innerHTML = `
+                <div class="module">
+                    <span class="label">PATCH NAME</span>
+                    <span class="val" style="font-size: 1.5rem;">${extractName(pcb)}</span>
+                </div>
+                <div class="module">
+                    <span class="label">OSC 1 WAVE</span>
+                    <span class="val">${pcb[0]}</span>
+                </div>
+                <div class="module">
+                    <span class="label">FILTER FREQ</span>
+                    <span class="val">${pcb[20]}</span>
+                </div>
+            `;
         }
     </script>
 </body>
