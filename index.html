@@ -2,187 +2,107 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ensoniq SQ-80 Librarian (Debug Mode)</title>
+    <title>Ensoniq SQ-80 Librarian (Legacy-Corrected)</title>
     <style>
-        :root { --bg: #121212; --panel: #1e1e1e; --module: #2a2a2a; --accent: #0078d4; --text: #e0e0e0; --label: #888; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        :root { --bg: #0f0f0f; --panel: #1a1a1a; --accent: #e74c3c; --text: #dcdcdc; }
+        body { font-family: 'Courier New', monospace; background: var(--bg); color: var(--text); padding: 20px; }
+        #drop-zone { width: 100%; height: 50px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; color: var(--accent); font-weight: bold; margin-bottom: 20px; }
+        .patch-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-bottom: 20px; }
+        .patch-item { background: #222; padding: 10px 5px; text-align: center; border: 1px solid #333; cursor: pointer; font-size: 0.8rem; }
+        .patch-item:hover { border-color: var(--accent); }
+        .patch-item.selected { background: var(--accent); color: white; }
         
-        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; font-weight: bold; color: var(--accent); }
-        
-        #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-bottom: 2px solid #333; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-        
-        .offset-controls { display: flex; align-items: center; gap: 10px; background: #000; padding: 5px 15px; border-radius: 4px; border: 1px solid #444; }
-        input[type=number] { background: #222; color: #0f0; border: 1px solid #444; padding: 4px; width: 50px; font-family: monospace; }
-
-        .bank-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .bank-container { background: #181818; padding: 12px; border-radius: 6px; border: 1px solid #333; }
-        .bank-header { font-weight: bold; color: var(--accent); margin-bottom: 10px; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .patch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-        .patch-item { background: var(--panel); padding: 10px 4px; border-radius: 4px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; }
-        .patch-item.selected { background: var(--accent); color: white; border-color: #fff; }
-
-        .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; margin-top: 25px; display: none; }
-        .module { background: var(--module); border-radius: 6px; border: 1px solid #444; overflow: hidden; }
-        .module-header { background: #333; padding: 6px 12px; font-size: 0.7rem; font-weight: bold; color: #aaa; text-transform: uppercase; }
-        .param-grid { display: grid; grid-template-columns: 50px repeat(4, 1fr); }
-        .cell { border: 1px solid #333; padding: 6px; font-family: monospace; }
-        .label { color: var(--label); font-size: 0.55rem; display: block; }
-        .val { color: #fff; font-weight: bold; font-size: 0.9rem; }
-        .mod-row { background: rgba(0,0,0,0.25); }
-        .span-4 { grid-column: span 4; } .span-3 { grid-column: span 3; } .span-6 { grid-column: span 6; }
+        .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border-top: 2px solid #444; padding-top: 20px; }
+        .module { background: #111; border: 1px solid #333; padding: 10px; }
+        .module-header { color: var(--accent); font-size: 0.7rem; margin-bottom: 8px; border-bottom: 1px solid #333; }
+        .val-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 3px; }
+        .label { color: #777; }
+        .num { color: #00ff00; }
     </style>
 </head>
 <body>
 
-    <div id="drop-zone">DROP SQ-80 SYSEX</div>
-    
-    <div id="status-bar">
-        <div id="file-info">Ready</div>
-        <div class="offset-controls">
-            <span class="label">START BYTE OFFSET:</span>
-            <input type="number" id="offset-input" value="10">
-            <span style="font-size: 10px; color: #666;">(Try 4, 5, 10, or 11)</span>
-        </div>
-    </div>
-
+    <div id="drop-zone">LOAD SQ-80 SYSEX (OFFSET 5 MODE)</div>
     <input type="file" id="file-input" style="display: none;">
-    <div id="bank-view" class="bank-wrapper"></div>
+    <div id="bank-view" class="patch-grid"></div>
     <div id="dashboard" class="dashboard"></div>
 
     <script>
-        const MOD_SOURCES = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL2", "KYBD", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
-        let currentRawData = null;
+        const MODS = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL-X", "KBD", "KBD2", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
+        const WAVES = ["SAW","BELL","SINE","SQUARE","PULSE","NOISE1","NOISE2","NOISE3","BASS","PIANO","ELPNO","VOICE1","VOICE2","KICK","REED","ORGAN"]; // Truncated for example
+        
+        let patches = [];
 
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
-        document.getElementById('file-input').onchange = (e) => handleFiles(e.target.files);
-        document.getElementById('offset-input').oninput = () => { if(currentRawData) processSysEx(currentRawData); };
-        
-        window.addEventListener("dragover", e => e.preventDefault());
-        window.addEventListener("drop", e => { e.preventDefault(); handleFiles(e.dataTransfer.files); });
-
-        function handleFiles(files) {
+        document.getElementById('file-input').onchange = (e) => {
             const reader = new FileReader();
-            reader.onload = (e) => {
-                currentRawData = new Uint8Array(e.target.result);
-                processSysEx(currentRawData);
-            };
-            reader.readAsArrayBuffer(files[0]);
-        }
+            reader.onload = (ev) => process(new Uint8Array(ev.target.result));
+            reader.readAsArrayBuffer(e.target.files[0]);
+        };
 
-        function unpack(data, startByte) {
+        function process(data) {
+            // THE PHP LOGIC: Start at byte 5, denibble LSN-first
             let unpacked = [];
-            for (let i = startByte; i < data.length - 1; i += 2) {
-                if (data[i] === 0xF7) break;
-                let low = data[i] & 0x0F;
-                let high = data[i+1] & 0x0F;
-                unpacked.push((high << 4) | low);
+            for (let i = 5; i < data.length - 1; i += 2) {
+                unpacked.push(((data[i+1] & 0x0F) << 4) | (data[i] & 0x0F));
             }
-            return new Uint8Array(unpacked);
-        }
 
-        function extractName(pcb) {
-            let name = "";
-            for(let i = 94; i < 100; i++) {
-                let c = pcb[i] & 0x7F;
-                name += (c >= 32 && c <= 95) ? String.fromCharCode(c) : " ";
+            patches = [];
+            const pcbSize = 102;
+            for (let i = 0; i < Math.floor(unpacked.length / pcbSize); i++) {
+                let pcb = unpacked.slice(i * pcbSize, (i + 1) * pcbSize);
+                // Name is at offset 0-5 per your PHP script
+                let name = "";
+                for(let n=0; n<6; n++) name += String.fromCharCode(pcb[n] & 0x7F);
+                patches.push({ name: name.replace(/[^a-zA-Z0-9\s]/g, ""), pcb: pcb });
             }
-            return name.trim();
+            render();
         }
 
-        function processSysEx(data) {
-            const bankView = document.getElementById('bank-view');
-            const offset = parseInt(document.getElementById('offset-input').value);
-            bankView.innerHTML = '';
-            document.getElementById('dashboard').style.display = 'none';
-
-            const fullBuffer = unpack(data, offset);
-            let patches = [];
-            const count = Math.floor(fullBuffer.length / 102);
-
-            for (let i = 0; i < count; i++) {
-                let pcb = fullBuffer.slice(i * 102, (i + 1) * 102);
-                patches.push({ pcb, name: extractName(pcb) || "???" });
-            }
-            renderView(patches, count > 1);
+        function render() {
+            const view = document.getElementById('bank-view');
+            view.innerHTML = '';
+            patches.forEach((p, i) => {
+                const div = document.createElement('div');
+                div.className = 'patch-item';
+                div.innerText = `${i+1}: ${p.name}`;
+                div.onclick = () => {
+                    document.querySelectorAll('.patch-item').forEach(el=>el.classList.remove('selected'));
+                    div.classList.add('selected');
+                    draw(p.pcb);
+                };
+                view.appendChild(div);
+            });
         }
 
-        function renderView(patches, isBank) {
-            const bankView = document.getElementById('bank-view');
-            const sections = isBank ? 4 : 1;
-            for (let b = 0; b < sections; b++) {
-                const container = document.createElement('div');
-                container.className = 'bank-container';
-                container.innerHTML = `<div class="bank-header">${isBank ? 'INT ' + (b+1) : 'SINGLE'}</div>`;
-                const grid = document.createElement('div');
-                grid.className = 'patch-grid';
-                for (let p = 0; p < (isBank ? 10 : 1); p++) {
-                    const idx = (b * 10) + p;
-                    if (patches[idx]) grid.appendChild(createPatchElement(patches[idx]));
-                }
-                container.appendChild(grid);
-                bankView.appendChild(container);
-            }
-        }
-
-        function createPatchElement(patch) {
-            const div = document.createElement('div');
-            div.className = 'patch-item';
-            div.innerText = patch.name;
-            div.onclick = () => {
-                document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
-                div.classList.add('selected');
-                drawDashboard(patch.pcb);
-            };
-            return div;
-        }
-
-        function drawDashboard(pcb) {
+        function draw(pcb) {
             const db = document.getElementById('dashboard');
-            db.style.display = 'grid';
             db.innerHTML = '';
             
-            // OSCILLATORS (Standard Packing)
-            for(let i=1; i<=3; i++) {
-                let b = (i-1)*5; let m = 12 + (i-1)*4;
-                db.innerHTML += `<div class="module span-4"><div class="module-header">OSC ${i}</div><div class="param-grid">
-                    <div class="cell"><span class="label">WAVE</span><span class="val">${pcb[b]}</span></div>
-                    <div class="cell"><span class="label">OCT</span><span class="val">${((pcb[b+1] >> 4) & 0x0F) - 3}</span></div>
-                    <div class="cell"><span class="label">SEMI</span><span class="val">${pcb[b+1] & 0x0F}</span></div>
-                    <div class="cell mod-row" style="grid-column:span 5"><span class="label">MOD</span><span class="val">${MOD_SOURCES[pcb[m]]} (${pcb[m+1] << 24 >> 24})</span></div>
-                </div></div>`;
+            // OSCILLATORS (Based on PHP: Offset 6 + 40 + 12 + osc*10)
+            for(let i=0; i<3; i++) {
+                let base = 6 + 40 + 12 + (i * 10);
+                let semi = pcb[base] & 0x7F;
+                db.innerHTML += `
+                    <div class="module">
+                        <div class="module-header">OSC ${i+1}</div>
+                        <div class="val-row"><span class="label">OCT</span><span class="num">${Math.floor(semi/12)-3}</span></div>
+                        <div class="val-row"><span class="label">SEMI</span><span class="num">${semi%12}</span></div>
+                        <div class="val-row"><span class="label">WAVE</span><span class="num">${pcb[base+5]}</span></div>
+                        <div class="val-row"><span class="label">MOD1</span><span class="num">${MODS[pcb[base+2] & 0x0F]}</span></div>
+                    </div>
+                `;
             }
 
-            // LFOs (Corrected Stuartkeith Errata)
-            for(let i=1; i<=3; i++) {
-                let b = 28 + (i-1)*4; 
-                // Manual errata fix: W0/W1 is actually Freq
-                db.innerHTML += `<div class="module span-4"><div class="module-header">LFO ${i}</div><div class="param-grid">
-                    <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[b]}</span></div>
-                    <div class="cell"><span class="label">MOD</span><span class="val">${pcb[b+1]}</span></div>
-                    <div class="cell"><span class="label">WAVE</span><span class="val">${pcb[b+2] & 7}</span></div>
-                    <div class="cell"><span class="label">DLY</span><span class="val">${pcb[b+3]}</span></div>
-                </div></div>`;
-            }
-
-            // ENVELOPES
-            for(let i=1; i<=4; i++) {
-                let b = 42 + (i-1)*12;
-                db.innerHTML += `<div class="module span-3"><div class="module-header">ENV ${i}</div><div class="param-grid">
-                    <div class="cell"><span class="label">L1</span><span class="val">${pcb[b]}</span></div>
-                    <div class="cell"><span class="label">T1</span><span class="val">${pcb[b+1]}</span></div>
-                    <div class="cell"><span class="label">L2</span><span class="val">${pcb[b+2]}</span></div>
-                    <div class="cell"><span class="label">T2</span><span class="val">${pcb[b+3]}</span></div>
-                    <div class="cell"><span class="label">L3</span><span class="val">${pcb[b+4]}</span></div>
-                    <div class="cell"><span class="label">T3</span><span class="val">${pcb[b+5]}</span></div>
-                </div></div>`;
-            }
-
-            // FILTER
-            db.innerHTML += `<div class="module span-12"><div class="module-header">FILTER</div><div class="param-grid">
-                <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[20]}</span></div>
-                <div class="cell"><span class="label">RES</span><span class="val">${pcb[21]}</span></div>
-                <div class="cell"><span class="label">KYBD</span><span class="val">${pcb[23]}</span></div>
-            </div></div>`;
+            // FILTER (Based on PHP: Offset 89, 90, 94)
+            db.innerHTML += `
+                <div class="module">
+                    <div class="module-header">FILTER</div>
+                    <div class="val-row"><span class="label">FREQ</span><span class="num">${pcb[89] & 0x3F}</span></div>
+                    <div class="val-row"><span class="label">RES</span><span class="num">${pcb[90] & 0x1F}</span></div>
+                    <div class="val-row"><span class="label">KBD</span><span class="num">${(pcb[94] >> 1) & 0x3F}</span></div>
+                </div>
+            `;
         }
     </script>
 </body>
