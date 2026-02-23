@@ -47,12 +47,24 @@
         .patch-item:hover { border-color: var(--accent); background: #252525; }
         .patch-item.selected { background: var(--accent); color: white; border-color: white; }
 
-        /* Dashboard Layout */
+        /* Dashboard Layout: 12-column grid for maximum flexibility */
         .dashboard {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-            gap: 15px; display: none;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 15px;
+            display: none;
         }
-        .module { background: var(--module); border-radius: 6px; overflow: hidden; border: 1px solid #444; }
+
+        /* Module Span Classes */
+        .span-4 { grid-column: span 4; } /* For 3-column rows */
+        .span-3 { grid-column: span 3; } /* For 4-column rows */
+
+        /* Responsive: Stack on small screens */
+        @media (max-width: 1000px) {
+            .span-4, .span-3 { grid-column: span 12; }
+        }
+
+        .module { background: var(--module); border-radius: 6px; overflow: hidden; border: 1px solid #444; height: 100%; }
         .module-header { background: #333; padding: 6px 12px; font-size: 0.8rem; font-weight: bold; color: #aaa; border-bottom: 1px solid #444; }
         
         .param-grid { display: grid; grid-template-columns: 60px repeat(4, 1fr); }
@@ -60,9 +72,6 @@
         .cell.mod-row { background: #222; }
         .label { color: var(--label); font-size: 0.65rem; display: block; text-transform: uppercase; }
         .val { color: #fff; font-size: 1rem; font-weight: bold; }
-        
-        /* Envelope Specials */
-        .env-grid { grid-template-columns: 60px repeat(4, 1fr); }
     </style>
 </head>
 <body>
@@ -77,8 +86,7 @@
 
     <div id="patch-list" class="patch-grid"></div>
 
-    <div id="dashboard" class="dashboard">
-        </div>
+    <div id="dashboard" class="dashboard"></div>
 
     <script>
         const dropZone = document.getElementById('drop-zone');
@@ -113,9 +121,9 @@
 
         function detectModel(pcb) {
             let sq80 = 0;
-            [0, 5, 10].forEach(o => { if(pcb[o] > 31) sq80++; }); // Waves
-            if (pcb[22] & 0x40) sq80++; // 2nd Rel
-            [42, 54, 66, 78].forEach(o => { if(pcb[o] & 0x40) sq80++; }); // Env Lin
+            [0, 5, 10].forEach(o => { if(pcb[o] > 31) sq80++; });
+            if (pcb[22] & 0x40) sq80++;
+            [42, 54, 66, 78].forEach(o => { if(pcb[o] & 0x40) sq80++; });
             return sq80 > 0 ? 'SQ80' : 'ESQ1';
         }
 
@@ -164,20 +172,37 @@
             dashboard.style.display = 'grid';
             dashboard.innerHTML = '';
 
-            // Layout Modules
-            dashboard.innerHTML += createOscModule("OSCILLATOR 1", pcb, 0, 12);
-            dashboard.innerHTML += createOscModule("OSCILLATOR 2", pcb, 5, 16);
-            dashboard.innerHTML += createOscModule("OSCILLATOR 3", pcb, 10, 20);
-            dashboard.innerHTML += createFilterModule(pcb);
-            dashboard.innerHTML += createEnvModule("ENVELOPE 1", pcb, 42);
-            dashboard.innerHTML += createEnvModule("ENVELOPE 2", pcb, 54);
-            dashboard.innerHTML += createEnvModule("ENVELOPE 3", pcb, 66);
-            dashboard.innerHTML += createEnvModule("ENVELOPE 4", pcb, 78);
+            // ROW 1: Oscillators (3 columns)
+            dashboard.innerHTML += createOscModule("OSCILLATOR 1", pcb, 0, 12, "span-4");
+            dashboard.innerHTML += createOscModule("OSCILLATOR 2", pcb, 5, 16, "span-4");
+            dashboard.innerHTML += createOscModule("OSCILLATOR 3", pcb, 10, 20, "span-4");
+
+            // ROW 2: DCAs 1-3 (3 columns)
+            dashboard.innerHTML += createDCAModule("DCA 1", pcb, 14, "span-4");
+            dashboard.innerHTML += createDCAModule("DCA 2", pcb, 18, "span-4");
+            dashboard.innerHTML += createDCAModule("DCA 3", pcb, 22, "span-4");
+
+            // ROW 3: LFOs (3 columns)
+            dashboard.innerHTML += createLFOModule("LFO 1", pcb, 28, "span-4");
+            dashboard.innerHTML += createLFOModule("LFO 2", pcb, 32, "span-4");
+            dashboard.innerHTML += createLFOModule("LFO 3", pcb, 36, "span-4");
+
+            // ROW 4: Envelopes (4 columns)
+            dashboard.innerHTML += createEnvModule("ENVELOPE 1", pcb, 42, "span-3");
+            dashboard.innerHTML += createEnvModule("ENVELOPE 2", pcb, 54, "span-3");
+            dashboard.innerHTML += createEnvModule("ENVELOPE 3", pcb, 66, "span-3");
+            dashboard.innerHTML += createEnvModule("ENVELOPE 4", pcb, 78, "span-3");
+
+            // ROW 5: Misc (4 columns)
+            dashboard.innerHTML += createFilterModule(pcb, "span-3");
+            dashboard.innerHTML += createGenericModule("MODES", "span-3");
+            dashboard.innerHTML += createGenericModule("SPLIT / LAYER", "span-3");
+            dashboard.innerHTML += createDCAModule("DCA 4 (FINAL)", pcb, 90, "span-3");
         }
 
-        function createOscModule(title, pcb, base, modBase) {
+        function createOscModule(title, pcb, base, modBase, span) {
             return `
-            <div class="module">
+            <div class="module ${span}">
                 <div class="module-header">${title}</div>
                 <div class="param-grid">
                     <div class="cell">MAIN</div>
@@ -197,9 +222,9 @@
             </div>`;
         }
 
-        function createFilterModule(pcb) {
+        function createFilterModule(pcb, span) {
             return `
-            <div class="module">
+            <div class="module ${span}">
                 <div class="module-header">FILTER</div>
                 <div class="param-grid">
                     <div class="cell">MAIN</div>
@@ -219,11 +244,11 @@
             </div>`;
         }
 
-        function createEnvModule(title, pcb, base) {
+        function createEnvModule(title, pcb, base, span) {
             return `
-            <div class="module">
-                <div class="module-header">${title} (${pcb[base] & 0x40 ? 'LINEAR' : 'EXP'})</div>
-                <div class="param-grid env-grid">
+            <div class="module ${span}">
+                <div class="module-header">${title} (${pcb[base] & 0x40 ? 'LIN' : 'EXP'})</div>
+                <div class="param-grid">
                     <div class="cell">LEVEL</div>
                     <div class="cell"><span class="label">L1</span><span class="val">${pcb[base] & 0x3F}</span></div>
                     <div class="cell"><span class="label">L2</span><span class="val">${pcb[base+2]}</span></div>
@@ -237,6 +262,37 @@
                     <div class="cell mod-row"><span class="label">T4</span><span class="val">${pcb[base+6]}</span></div>
                 </div>
             </div>`;
+        }
+
+        function createDCAModule(title, pcb, base, span) {
+            return `
+            <div class="module ${span}">
+                <div class="module-header">${title}</div>
+                <div class="param-grid">
+                    <div class="cell">MAIN</div>
+                    <div class="cell" style="grid-column: span 4"><span class="label">LEVEL</span><span class="val">${pcb[base]}</span></div>
+                    <div class="cell mod-row">MOD</div>
+                    <div class="cell mod-row" style="grid-column: span 4"><span class="label">MOD SOURCE</span><span class="val">${MOD_SOURCES[pcb[base+1]]} * ${pcb[base+2]}</span></div>
+                </div>
+            </div>`;
+        }
+
+        function createLFOModule(title, pcb, base, span) {
+            return `
+            <div class="module ${span}">
+                <div class="module-header">${title}</div>
+                <div class="param-grid">
+                    <div class="cell">MAIN</div>
+                    <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[base]}</span></div>
+                    <div class="cell"><span class="label">WAVE</span><span class="val">${pcb[base+2]}</span></div>
+                    <div class="cell"><span class="label">DLY</span><span class="val">${pcb[base+3]}</span></div>
+                    <div class="cell"><span class="label">RST</span><span class="val">${pcb[base+2] > 63 ? 'ON' : 'OFF'}</span></div>
+                </div>
+            </div>`;
+        }
+
+        function createGenericModule(title, span) {
+            return `<div class="module ${span}"><div class="module-header">${title}</div><div style="padding:15px; color:#555; font-size:0.7rem;">DATA PENDING...</div></div>`;
         }
     </script>
 </body>
