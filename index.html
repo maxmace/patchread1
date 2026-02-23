@@ -7,35 +7,22 @@
         :root {
             --bg: #121212; --panel: #1e1e1e; --module: #2a2a2a;
             --accent: #0078d4; --text: #e0e0e0; --label: #888;
-            --sq80: #d4a017; --esq1: #27ae60;
+            --sq80: #d4a017;
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
         
         #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; }
-        #drop-zone:hover { border-color: var(--accent); }
-        
         #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #333; }
         
         /* Compact 2x2 Bank Layout */
-        .bank-wrapper {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
+        .bank-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .bank-container { background: #181818; padding: 10px; border-radius: 6px; border: 1px solid #333; }
         .bank-header { font-weight: bold; color: var(--accent); margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
         
-        .patch-grid { 
-            display: grid; 
-            grid-template-columns: repeat(5, 1fr); 
-            gap: 5px; 
-        }
-        .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; overflow: hidden; }
-        .patch-item:hover { border-color: var(--accent); }
+        .patch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+        .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; }
         .patch-item.selected { background: var(--accent); color: white; border-color: #fff; }
 
-        /* Dashboard */
         .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; display: none; margin-top: 20px; }
         .span-4 { grid-column: span 4; } 
         .span-3 { grid-column: span 3; }
@@ -73,8 +60,11 @@
         const MOD_SOURCES = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL2", "KYBD", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
         const LFO_WAVES = ["TRI", "SAW", "SQR", "NOISE", "RAND"];
 
+        // Global storage for console debugging
+        window.lastPcb = null;
+
         dropZone.onclick = () => fileInput.click();
-        dropZone.ondragover = (e) => { e.preventDefault(); };
+        dropZone.ondragover = (e) => e.preventDefault();
         dropZone.ondrop = (e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); };
         fileInput.onchange = (e) => handleFiles(e.target.files);
 
@@ -86,16 +76,11 @@
             reader.readAsArrayBuffer(file);
         }
 
-        /**
-         * Ensoniq SQ-80 Data Unpacking
-         * Data is typically stored as:
-         * Byte 0: 0000llll (Low Nibble)
-         * Byte 1: 0000hhhh (High Nibble)
-         * Result: hhhhllll
-         */
         function unpackNibbles(data, start) {
             let pcb = new Uint8Array(102);
             for (let i = 0; i < 102; i++) {
+                // Testing most common Ensoniq layout: 
+                // data[n] = low nibble, data[n+1] = high nibble
                 let low = data[start + (i * 2)] & 0x0F;
                 let high = data[start + (i * 2) + 1] & 0x0F;
                 pcb[i] = (high << 4) | low;
@@ -105,38 +90,26 @@
 
         function extractName(pcb) {
             let name = "";
-            // Patch name is bytes 94-99
             for(let i=94; i<100; i++) {
                 let charCode = pcb[i] & 0x7F; 
-                // Filter out non-printable ASCII
-                if (charCode >= 32 && charCode <= 126) {
-                    name += String.fromCharCode(charCode);
-                } else {
-                    name += " ";
-                }
+                name += (charCode >= 32 && charCode <= 126) ? String.fromCharCode(charCode) : " ";
             }
-            return name.trim() || "UNTITL";
+            return name.trim();
         }
 
         function processSysEx(data, filename) {
-            // Basic SysEx check (F0 0F ...)
-            if (data[0] !== 0xF0) return alert("Not a valid SysEx file.");
-            
             bankView.innerHTML = '';
             dashboard.style.display = 'none';
             let patches = [];
 
-            // A bank of 40 patches (204 bytes per nibbled patch) 
-            // starts at offset 10 in standard Ensoniq dumps
-            if (data.length > 1000) {
-                for (let i = 0; i < 40; i++) {
-                    const offset = 10 + (i * 204);
-                    const pcb = unpackNibbles(data, offset);
-                    patches.push({ pcb: pcb, name: extractName(pcb) });
-                }
-            } else {
-                // Single patch mode
-                const pcb = unpackNibbles(data, 10);
+            // Standard Ensoniq offset is 10 (after F0 0F ... header)
+            const isBank = data.length > 500;
+            const count = isBank ? 40 : 1;
+
+            for (let i = 0; i < count; i++) {
+                const offset = 10 + (i * 204);
+                if (offset + 204 > data.length) break;
+                const pcb = unpackNibbles(data, offset);
                 patches.push({ pcb: pcb, name: extractName(pcb) });
             }
 
@@ -145,23 +118,13 @@
         }
 
         function renderBankView(patches) {
-            if (patches.length === 1) {
-                const soloContainer = document.createElement('div');
-                soloContainer.className = 'bank-container';
-                soloContainer.style.gridColumn = "span 2";
-                soloContainer.appendChild(createPatchElement(patches[0]));
-                bankView.appendChild(soloContainer);
-                return;
-            }
-
-            for (let b = 0; b < 4; b++) {
+            const numBanks = patches.length === 1 ? 1 : 4;
+            for (let b = 0; b < numBanks; b++) {
                 const bankDiv = document.createElement('div');
                 bankDiv.className = 'bank-container';
                 bankDiv.innerHTML = `<div class="bank-header">INT ${b + 1}</div>`;
-                
                 const grid = document.createElement('div');
                 grid.className = 'patch-grid';
-                
                 for (let p = 0; p < 10; p++) {
                     const idx = (b * 10) + p;
                     if (patches[idx]) {
@@ -176,38 +139,38 @@
         function createPatchElement(patch) {
             const div = document.createElement('div');
             div.className = 'patch-item';
-            div.innerText = patch.name;
+            div.innerText = patch.name || "UNTITL";
             div.onclick = () => {
                 document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
                 div.classList.add('selected');
+                window.lastPcb = patch.pcb; // Make accessible to console
                 drawDashboard(patch.pcb, patch.name);
             };
             return div;
         }
 
-        // Module Creation Functions (Osc, DCA, LFO, etc.)
         function drawDashboard(pcb, name) {
             dashboard.style.display = 'grid';
             dashboard.innerHTML = '';
-
-            // Layout as requested: 3x3 then 2x4
+            
+            // OSC
             dashboard.innerHTML += createOscModule("OSCILLATOR 1", pcb, 0, 12, "span-4");
             dashboard.innerHTML += createOscModule("OSCILLATOR 2", pcb, 5, 16, "span-4");
             dashboard.innerHTML += createOscModule("OSCILLATOR 3", pcb, 10, 20, "span-4");
-            
+            // DCA
             dashboard.innerHTML += createDCAModule("DCA 1", pcb, 14, "span-4");
             dashboard.innerHTML += createDCAModule("DCA 2", pcb, 18, "span-4");
             dashboard.innerHTML += createDCAModule("DCA 3", pcb, 22, "span-4");
-
+            // LFO
             dashboard.innerHTML += createLFOModule("LFO 1", pcb, 28, "span-4");
             dashboard.innerHTML += createLFOModule("LFO 2", pcb, 32, "span-4");
             dashboard.innerHTML += createLFOModule("LFO 3", pcb, 36, "span-4");
-
+            // ENV
             dashboard.innerHTML += createEnvModule("ENVELOPE 1", pcb, 42, "span-3");
             dashboard.innerHTML += createEnvModule("ENVELOPE 2", pcb, 54, "span-3");
             dashboard.innerHTML += createEnvModule("ENVELOPE 3", pcb, 66, "span-3");
             dashboard.innerHTML += createEnvModule("ENVELOPE 4", pcb, 78, "span-3");
-
+            // MISC
             dashboard.innerHTML += createFilterModule(pcb, "span-3");
             dashboard.innerHTML += createModesModule(pcb, "span-3");
             dashboard.innerHTML += createSplitModule(pcb, "span-3");
@@ -215,76 +178,31 @@
         }
 
         function createOscModule(title, pcb, b, m, span) {
-            return `<div class="module ${span}"><div class="module-header">${title}</div>
-                <div class="param-grid">
-                    <div class="cell"><span class="label">WAVE</span><span class="val">${pcb[b]}</span></div>
-                    <div class="cell"><span class="label">OCT</span><span class="val">${((pcb[b+1] >> 4) & 0x0F) - 3}</span></div>
-                    <div class="cell"><span class="label">SEMI</span><span class="val">${pcb[b+1] & 0x0F}</span></div>
-                    <div class="cell" style="grid-column:span 2"><span class="label">FINE</span><span class="val">${pcb[b+2]}</span></div>
-                    <div class="cell mod-row">MODS</div>
-                    <div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m]]}</span><span class="val">${(pcb[m+1] << 24 >> 24)}</span></div>
-                    <div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m+2]]}</span><span class="val">${(pcb[m+3] << 24 >> 24)}</span></div>
-                </div></div>`;
+            return `<div class="module ${span}"><div class="module-header">${title}</div><div class="param-grid"><div class="cell"><span class="label">WAVE</span><span class="val">${pcb[b]}</span></div><div class="cell"><span class="label">OCT</span><span class="val">${((pcb[b+1] >> 4) & 0x0F) - 3}</span></div><div class="cell"><span class="label">SEMI</span><span class="val">${pcb[b+1] & 0x0F}</span></div><div class="cell" style="grid-column:span 2"><span class="label">FINE</span><span class="val">${pcb[b+2]}</span></div><div class="cell mod-row">MODS</div><div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m]]}</span><span class="val">${(pcb[m+1] << 24 >> 24)}</span></div><div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m+2]]}</span><span class="val">${(pcb[m+3] << 24 >> 24)}</span></div></div></div>`;
         }
 
         function createDCAModule(title, pcb, b, span) {
-            return `<div class="module ${span}"><div class="module-header">${title}</div>
-                <div class="param-grid">
-                    <div class="cell">LVL</div><div class="cell" style="grid-column:span 4"><span class="val">${pcb[b]}</span></div>
-                    <div class="cell mod-row">MOD</div>
-                    <div class="cell mod-row" style="grid-column:span 2"><span class="label">SRC</span><span class="val">${MOD_SOURCES[pcb[b+1]]}</span></div>
-                    <div class="cell mod-row" style="grid-column:span 2"><span class="label">AMT</span><span class="val">${(pcb[b+2] << 24 >> 24)}</span></div>
-                </div></div>`;
+            return `<div class="module ${span}"><div class="module-header">${title}</div><div class="param-grid"><div class="cell">LVL</div><div class="cell" style="grid-column:span 4"><span class="val">${pcb[b]}</span></div><div class="cell mod-row">MOD</div><div class="cell mod-row" style="grid-column:span 2"><span class="label">SRC</span><span class="val">${MOD_SOURCES[pcb[b+1]]}</span></div><div class="cell mod-row" style="grid-column:span 2"><span class="label">AMT</span><span class="val">${(pcb[b+2] << 24 >> 24)}</span></div></div></div>`;
         }
 
         function createLFOModule(title, pcb, b, span) {
-            const humanWave = LFO_WAVES[pcb[b+2] & 0x07] || "TRI";
-            return `<div class="module ${span}"><div class="module-header">${title}</div>
-                <div class="param-grid">
-                    <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[b]}</span></div>
-                    <div class="cell"><span class="label">WAVE</span><span class="val">${humanWave}</span></div>
-                    <div class="cell"><span class="label">DLY</span><span class="val">${pcb[b+3]}</span></div>
-                    <div class="cell"><span class="label">MOD</span><span class="val">${pcb[b+1]}</span></div>
-                    <div class="cell"><span class="label">RST</span><span class="val">${(pcb[b+2] & 0x80) ? 'ON' : 'OFF'}</span></div>
-                </div></div>`;
+            return `<div class="module ${span}"><div class="module-header">${title}</div><div class="param-grid"><div class="cell"><span class="label">FREQ</span><span class="val">${pcb[b]}</span></div><div class="cell"><span class="label">WAVE</span><span class="val">${LFO_WAVES[pcb[b+2] & 0x07] || "TRI"}</span></div><div class="cell"><span class="label">DLY</span><span class="val">${pcb[b+3]}</span></div><div class="cell"><span class="label">MOD</span><span class="val">${pcb[b+1]}</span></div><div class="cell"><span class="label">RST</span><span class="val">${(pcb[b+2] & 0x80) ? 'ON' : 'OFF'}</span></div></div></div>`;
         }
 
         function createEnvModule(title, pcb, b, span) {
-            return `<div class="module ${span}"><div class="module-header">${title}</div>
-                <div class="param-grid">
-                    <div class="cell"><span class="label">L1</span><span class="val">${pcb[b] & 0x3F}</span></div>
-                    <div class="cell"><span class="label">L2</span><span class="val">${pcb[b+2]}</span></div><div class="cell"><span class="label">L3</span><span class="val">${pcb[b+4]}</span></div><div class="cell"><span class="label">LV</span><span class="val">${pcb[b+10]}</span></div><div class="cell"></div>
-                    <div class="cell mod-row"><span class="label">T1</span><span class="val">${pcb[b+1]}</span></div>
-                    <div class="cell mod-row"><span class="label">T2</span><span class="val">${pcb[b+3]}</span></div><div class="cell mod-row"><span class="label">T3</span><span class="val">${pcb[b+5]}</span></div><div class="cell mod-row"><span class="label">T4</span><span class="val">${pcb[b+6]}</span></div><div class="cell mod-row"></div>
-                </div></div>`;
+            return `<div class="module ${span}"><div class="module-header">${title}</div><div class="param-grid"><div class="cell"><span class="label">L1</span><span class="val">${pcb[b] & 0x3F}</span></div><div class="cell"><span class="label">L2</span><span class="val">${pcb[b+2]}</span></div><div class="cell"><span class="label">L3</span><span class="val">${pcb[b+4]}</span></div><div class="cell"><span class="label">LV</span><span class="val">${pcb[b+10]}</span></div><div class="cell"></div><div class="cell mod-row"><span class="label">T1</span><span class="val">${pcb[b+1]}</span></div><div class="cell mod-row"><span class="label">T2</span><span class="val">${pcb[b+3]}</span></div><div class="cell mod-row"><span class="label">T3</span><span class="val">${pcb[b+5]}</span></div><div class="cell mod-row"><span class="label">T4</span><span class="val">${pcb[b+6]}</span></div><div class="cell mod-row"></div></div></div>`;
         }
 
         function createFilterModule(pcb, span) {
-            return `<div class="module ${span}"><div class="module-header">FILTER</div>
-                <div class="param-grid">
-                    <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[20]}</span></div><div class="cell"><span class="label">RES</span><span class="val">${pcb[21]}</span></div>
-                    <div class="cell"><span class="label">KYB</span><span class="val">${pcb[23]}</span></div><div class="cell" style="grid-column:span 2"></div>
-                    <div class="cell mod-row"><span class="label">MOD1</span><span class="val">${MOD_SOURCES[pcb[24]]}</span></div><div class="cell mod-row"><span class="label">AMT</span><span class="val">${(pcb[25] << 24 >> 24)}</span></div>
-                    <div class="cell mod-row"><span class="label">MOD2</span><span class="val">${MOD_SOURCES[pcb[26]]}</span></div><div class="cell mod-row"><span class="label">AMT</span><span class="val">${(pcb[27] << 24 >> 24)}</span></div>
-                </div></div>`;
+            return `<div class="module ${span}"><div class="module-header">FILTER</div><div class="param-grid"><div class="cell"><span class="label">FREQ</span><span class="val">${pcb[20]}</span></div><div class="cell"><span class="label">RES</span><span class="val">${pcb[21]}</span></div><div class="cell"><span class="label">KYB</span><span class="val">${pcb[23]}</span></div><div class="cell" style="grid-column:span 2"></div><div class="cell mod-row"><span class="label">MOD1</span><span class="val">${MOD_SOURCES[pcb[24]]}</span></div><div class="cell mod-row"><span class="label">AMT</span><span class="val">${(pcb[25] << 24 >> 24)}</span></div><div class="cell mod-row"><span class="label">MOD2</span><span class="val">${MOD_SOURCES[pcb[26]]}</span></div><div class="cell mod-row"><span class="label">AMT</span><span class="val">${(pcb[27] << 24 >> 24)}</span></div></div></div>`;
         }
 
         function createModesModule(pcb, span) {
-            return `<div class="module ${span}"><div class="module-header">MODES</div>
-                <div class="param-grid">
-                    <div class="cell"><span class="label">SYNC</span><span class="val">${(pcb[40] & 0x01) ? 'ON' : 'OFF'}</span></div>
-                    <div class="cell"><span class="label">AM</span><span class="val">${(pcb[40] & 0x02) ? 'ON' : 'OFF'}</span></div>
-                    <div class="cell"><span class="label">MONO</span><span class="val">${(pcb[40] & 0x04) ? 'ON' : 'OFF'}</span></div>
-                    <div class="cell" style="grid-column:span 2"><span class="label">GLIDE</span><span class="val">${pcb[41]}</span></div>
-                </div></div>`;
+            return `<div class="module ${span}"><div class="module-header">MODES</div><div class="param-grid"><div class="cell"><span class="label">SYNC</span><span class="val">${(pcb[40] & 0x01) ? 'ON' : 'OFF'}</span></div><div class="cell"><span class="label">AM</span><span class="val">${(pcb[40] & 0x02) ? 'ON' : 'OFF'}</span></div><div class="cell"><span class="label">MONO</span><span class="val">${(pcb[40] & 0x04) ? 'ON' : 'OFF'}</span></div><div class="cell" style="grid-column:span 2"><span class="label">GLIDE</span><span class="val">${pcb[41]}</span></div></div></div>`;
         }
 
         function createSplitModule(pcb, span) {
-            return `<div class="module ${span}"><div class="module-header">SPLIT/LAYER</div>
-                <div class="param-grid">
-                    <div class="cell" style="grid-column:span 2"><span class="label">PROG</span><span class="val">${pcb[92]}</span></div>
-                    <div class="cell" style="grid-column:span 2"><span class="label">KEY</span><span class="val">${pcb[93]}</span></div>
-                </div></div>`;
+            return `<div class="module ${span}"><div class="module-header">SPLIT/LAYER</div><div class="param-grid"><div class="cell" style="grid-column:span 2"><span class="label">PROG</span><span class="val">${pcb[92]}</span></div><div class="cell" style="grid-column:span 2"><span class="label">KEY</span><span class="val">${pcb[93]}</span></div></div></div>`;
         }
     </script>
 </body>
