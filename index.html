@@ -27,7 +27,7 @@
 </head>
 <body>
 
-    <div id="drop-zone">DRAG & DROP ENSONIQ .SYX</div>
+    <div id="drop-zone">LOAD SQ-80 SYSEX</div>
     <input type="file" id="file-input" style="display: none;">
     <div id="status-bar"><span id="file-info">Ready</span><span id="patch-count-badge"></span></div>
     <div id="bank-view" class="bank-wrapper"></div>
@@ -35,6 +35,12 @@
 
     <script>
         const MOD_SOURCES = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL2", "KYBD", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
+        
+        // SQ-80 Waveforms (Standard Set)
+        const SQ80_WAVES = [
+            "SAW", "SQUARE", "TRIANG", "SINE", "SQR2", "RES1", "RES2", "RES3", "RES4", "4OCTS", "PRIME", "BASS", "REED", "ORGAN", "SYNTH", "BELL", "DRUM", "HI-RE", "GRIT1", "GRIT2", "GRIT3", "GLINT", "CHIME", "BOWING", "PICK", "DIGI1", "DIGI2", "DIGI3", "VOICE1", "VOICE2", "MALLET", "BREATH"
+            // Note: Add more if needed for SQ-80 expanded waves
+        ];
 
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = (e) => handleFiles(e.target.files);
@@ -50,41 +56,29 @@
         }
 
         /**
-         * Reconstructs 8-bit bytes from a 7-bit MIDI stream.
-         * This handles the "all-data" packing used in SQ-80 dumps.
+         * The PHP Logic: 
+         * Skip first 5 bytes, then ($i2 * 16) + $i1
          */
-        function bitStreamUnpack(data, start, targetLength) {
-            let pcb = new Uint8Array(targetLength);
-            let bitBuffer = 0;
-            let bitsInOverflow = 0;
-            let pcbIdx = 0;
-            let midiIdx = start;
-
-            while (pcbIdx < targetLength && midiIdx < data.length) {
-                // Add 7 bits from MIDI byte to buffer
-                bitBuffer |= (data[midiIdx] & 0x7F) << bitsInOverflow;
-                bitsInOverflow += 7;
-                midiIdx++;
-
-                // If we have at least 8 bits, extract one byte
-                if (bitsInOverflow >= 8) {
-                    pcb[pcbIdx++] = bitBuffer & 0xFF;
-                    bitBuffer >>= 8;
-                    bitsInOverflow -= 8;
-                }
+        function denibbleize(data) {
+            let unpacked = [];
+            // Start at byte 5 as per your PHP code
+            for (let i = 5; i < data.length - 1; i += 2) {
+                let i1 = data[i];
+                let i2 = data[i+1];
+                if (i2 === 0xF7) break; // End of SysEx
+                unpacked.push((i2 * 16) + i1);
             }
-            return pcb;
+            return new Uint8Array(unpacked);
         }
 
         function extractName(pcb) {
             let name = "";
             for(let i=94; i<100; i++) {
                 let c = pcb[i] & 0x7F;
-                // Hardware only supports uppercase and symbols (32-95)
-                if (c >= 32 && c <= 126) name += String.fromCharCode(c);
+                if (c >= 32 && c <= 95) name += String.fromCharCode(c);
                 else name += " ";
             }
-            return name.trim().toUpperCase();
+            return name.trim();
         }
 
         function processSysEx(data, filename) {
@@ -92,22 +86,20 @@
             bankView.innerHTML = '';
             document.getElementById('dashboard').style.display = 'none';
 
-            let patches = [];
-            const isBank = data.length > 500;
-            const count = isBank ? 40 : 1;
+            // Unpack the whole file first
+            const fullPcbBuffer = denibbleize(data);
             
-            // Header is 10 bytes: F0 0F 03 00 00 00 00 00 00 00
-            // Each patch record is 102 bytes internal, which takes ~117 MIDI bytes packed
-            const midiStride = Math.ceil((102 * 8) / 7);
+            let patches = [];
+            const patchSize = 102; 
+            const count = Math.floor(fullPcbBuffer.length / patchSize);
 
             for (let i = 0; i < count; i++) {
-                const start = 10 + (i * midiStride);
-                const pcb = bitStreamUnpack(data, start, 102);
+                let pcb = fullPcbBuffer.slice(i * patchSize, (i + 1) * patchSize);
                 patches.push({ pcb, name: extractName(pcb) });
             }
 
             document.getElementById('file-info').innerText = filename;
-            renderView(patches, isBank);
+            renderView(patches, count > 1);
         }
 
         function renderView(patches, isBank) {
@@ -116,7 +108,7 @@
             for (let b = 0; b < sections; b++) {
                 const container = document.createElement('div');
                 container.className = 'bank-container';
-                container.innerHTML = `<div class="bank-header">${isBank ? 'INT ' + (b+1) : 'SINGLE'}</div>`;
+                container.innerHTML = `<div class="bank-header">${isBank ? 'INTERNAL BANK ' + (b+1) : 'SINGLE PATCH'}</div>`;
                 const grid = document.createElement('div');
                 grid.className = 'patch-grid';
                 for (let p = 0; p < (isBank ? 10 : 1); p++) {
@@ -126,9 +118,7 @@
                 container.appendChild(grid);
                 bankView.appendChild(container);
             }
-            if (!isBank && bankView.querySelector('.patch-item')) {
-                bankView.querySelector('.patch-item').click();
-            }
+            if (!isBank) bankView.querySelector('.patch-item').click();
         }
 
         function createPatchElement(patch) {
@@ -148,52 +138,24 @@
             db.style.display = 'grid';
             db.innerHTML = '';
             
-            // Re-render the full PCB structure
-            db.innerHTML += createOscModule("OSC 1", pcb, 0, 12);
-            db.innerHTML += createOscModule("OSC 2", pcb, 5, 16);
-            db.innerHTML += createOscModule("OSC 3", pcb, 10, 20);
-            db.innerHTML += createDCAModule("DCA 1", pcb, 14);
-            db.innerHTML += createDCAModule("DCA 2", pcb, 18);
-            db.innerHTML += createDCAModule("DCA 3", pcb, 22);
-            db.innerHTML += createEnvModule("ENV 1", pcb, 42);
-            db.innerHTML += createEnvModule("ENV 2", pcb, 54);
-            db.innerHTML += createEnvModule("ENV 3", pcb, 66);
-            db.innerHTML += createEnvModule("ENV 4", pcb, 78);
-            db.innerHTML += createFilterModule(pcb);
-            db.innerHTML += createDCAModule("DCA 4 (PAN)", pcb, 90);
-        }
+            // OSC Section
+            for(let i=1; i<=3; i++) {
+                let off = (i-1)*5;
+                let waveIdx = pcb[off];
+                let waveName = SQ80_WAVES[waveIdx] || waveIdx;
+                db.innerHTML += `
+                <div class="module span-4"><div class="module-header">OSCILLATOR ${i}</div><div class="param-grid">
+                    <div class="cell" style="grid-column:span 3"><span class="label">WAVE</span><span class="val">${waveName}</span></div>
+                    <div class="cell"><span class="label">OCT</span><span class="val">${(pcb[off+1] >> 4) - 3}</span></div>
+                    <div class="cell"><span class="label">SEMI</span><span class="val">${pcb[off+1] & 0x0F}</span></div>
+                </div></div>`;
+            }
 
-        function createOscModule(title, pcb, b, m) {
-            return `<div class="module span-4"><div class="module-header">${title}</div><div class="param-grid">
-                <div class="cell"><span class="label">WAVE</span><span class="val">${pcb[b]}</span></div>
-                <div class="cell"><span class="label">OCT</span><span class="val">${(pcb[b+1] >> 4) - 3}</span></div>
-                <div class="cell"><span class="label">SEMI</span><span class="val">${pcb[b+1] & 0x0F}</span></div>
-                <div class="cell" style="grid-column:span 2"><span class="label">FINE</span><span class="val">${pcb[b+2]}</span></div>
-                <div class="cell mod-row" style="grid-column:span 5"><span class="label">MOD</span><span class="val">${MOD_SOURCES[pcb[m]]} (${(pcb[m+1]<<24>>24)})</span></div>
-            </div></div>`;
-        }
-
-        function createDCAModule(title, pcb, b) {
-            return `<div class="module span-4"><div class="module-header">${title}</div><div class="param-grid">
-                <div class="cell">LVL</div><div class="cell" style="grid-column:span 4"><span class="val">${pcb[b]}</span></div>
-                <div class="cell mod-row" style="grid-column:span 5"><span class="label">MOD</span><span class="val">${MOD_SOURCES[pcb[b+1]]} (${(pcb[b+2]<<24>>24)})</span></div>
-            </div></div>`;
-        }
-
-        function createEnvModule(title, pcb, b) {
-            return `<div class="module span-3"><div class="module-header">${title}</div><div class="param-grid">
-                <div class="cell"><span class="label">L1</span><span class="val">${pcb[b]}</span></div>
-                <div class="cell"><span class="label">L2</span><span class="val">${pcb[b+2]}</span></div>
-                <div class="cell"><span class="label">L3</span><span class="val">${pcb[b+4]}</span></div>
-                <div class="cell"><span class="label">T1</span><span class="val">${pcb[b+1]}</span></div>
-            </div></div>`;
-        }
-
-        function createFilterModule(pcb) {
-            return `<div class="module span-4"><div class="module-header">FILTER</div><div class="param-grid">
+            // Simple Filter View
+            db.innerHTML += `
+            <div class="module span-4"><div class="module-header">FILTER</div><div class="param-grid">
                 <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[20]}</span></div>
                 <div class="cell"><span class="label">RES</span><span class="val">${pcb[21]}</span></div>
-                <div class="cell mod-row" style="grid-column:span 5"><span class="label">MOD</span><span class="val">${MOD_SOURCES[pcb[24]]} (${(pcb[25]<<24>>24)})</span></div>
             </div></div>`;
         }
     </script>
