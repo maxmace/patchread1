@@ -6,14 +6,14 @@
     <style>
         :root { --bg: #121212; --panel: #1e1e1e; --module: #2a2a2a; --accent: #0078d4; --text: #e0e0e0; --label: #888; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; border: 2px dashed #444; transition: 0.2s; }
+        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; transition: 0.2s; }
         #drop-zone:hover { border-color: var(--accent); background: #252525; }
         #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; border-bottom: 2px solid #333; justify-content: space-between; align-items: center; }
         .bank-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .bank-container { background: #181818; padding: 10px; border-radius: 6px; border: 1px solid #333; }
         .bank-header { font-weight: bold; color: var(--accent); margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
         .patch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-        .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; transition: 0.1s; }
+        .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; transition: 0.1s; overflow: hidden; white-space: nowrap; }
         .patch-item:hover { border-color: #666; }
         .patch-item.selected { background: var(--accent); color: white; border-color: #fff; }
         .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; margin-top: 20px; display: none; }
@@ -34,7 +34,6 @@
 
     <div id="status-bar">
         <span id="file-info">Ready</span>
-        <div id="model-badge"></div>
     </div>
 
     <div id="bank-view" class="bank-wrapper"></div>
@@ -43,8 +42,6 @@
     <script>
         const MOD_SOURCES = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL2", "KYBD", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
         const LFO_WAVES = ["TRI", "SAW", "SQR", "NOISE", "RAND"];
-
-        window.lastPcb = null;
 
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = (e) => handleFiles(e.target.files);
@@ -61,9 +58,10 @@
 
         function unpackSQ80(data, start) {
             let pcb = new Uint8Array(102);
-            // Sliding the offset by 1 byte to correct the "xs" alignment
+            // Sliding by 1 MIDI byte to align nibbles correctly for SQ-80
             let adjustedStart = start + 1; 
             for (let i = 0; i < 102; i++) {
+                if (adjustedStart + (i * 2) + 1 >= data.length) break;
                 let low = data[adjustedStart + (i * 2)] & 0x0F;
                 let high = data[adjustedStart + (i * 2) + 1] & 0x0F;
                 pcb[i] = (high << 4) | low;
@@ -87,16 +85,17 @@
             dashboard.style.display = 'none';
 
             let patches = [];
-            const isBank = data.length > 1000;
+            // strict length check
+            const isBank = data.length > 500; 
             const count = isBank ? 40 : 1;
-            // The header is usually 10 bytes: F0 0F 03 00 ...
             const headerOffset = 10;
 
             for (let i = 0; i < count; i++) {
                 const offset = headerOffset + (i * 204); 
-                if (offset + 204 > data.length) break;
+                if (offset + 200 > data.length) break;
                 const pcb = unpackSQ80(data, offset);
-                patches.push({ pcb, name: extractName(pcb) });
+                const name = extractName(pcb);
+                patches.push({ pcb, name: name || "UNTITL" });
             }
 
             document.getElementById('file-info').innerText = `${filename} (${patches.length} Patches)`;
@@ -105,7 +104,7 @@
 
         function renderView(patches, isBank) {
             const bankView = document.getElementById('bank-view');
-            if (!isBank) {
+            if (!isBank && patches.length > 0) {
                 const solo = document.createElement('div');
                 solo.className = 'bank-container';
                 solo.style.gridColumn = "span 2";
@@ -126,7 +125,9 @@
                 grid.className = 'patch-grid';
                 for (let p = 0; p < 10; p++) {
                     const idx = (b * 10) + p;
-                    if (patches[idx]) grid.appendChild(createPatchElement(patches[idx]));
+                    if (patches[idx]) {
+                        grid.appendChild(createPatchElement(patches[idx]));
+                    }
                 }
                 container.appendChild(grid);
                 bankView.appendChild(container);
@@ -136,11 +137,10 @@
         function createPatchElement(patch) {
             const div = document.createElement('div');
             div.className = 'patch-item';
-            div.innerText = patch.name || "UNTITLED";
+            div.innerText = patch.name;
             div.onclick = () => {
                 document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
                 div.classList.add('selected');
-                window.lastPcb = patch.pcb;
                 drawDashboard(patch.pcb);
             };
             return div;
@@ -151,28 +151,28 @@
             db.style.display = 'grid';
             db.innerHTML = '';
             
-            // OSC Section
+            // Row 1: OSCs
             db.innerHTML += createOscModule("OSC 1", pcb, 0, 12);
             db.innerHTML += createOscModule("OSC 2", pcb, 5, 16);
             db.innerHTML += createOscModule("OSC 3", pcb, 10, 20);
 
-            // DCA Section
+            // Row 2: DCAs
             db.innerHTML += createDCAModule("DCA 1", pcb, 14);
             db.innerHTML += createDCAModule("DCA 2", pcb, 18);
             db.innerHTML += createDCAModule("DCA 3", pcb, 22);
 
-            // LFO Section
+            // Row 3: LFOs
             db.innerHTML += createLFOModule("LFO 1", pcb, 28);
             db.innerHTML += createLFOModule("LFO 2", pcb, 32);
             db.innerHTML += createLFOModule("LFO 3", pcb, 36);
 
-            // Env Section
+            // Row 4: ENVs
             db.innerHTML += createEnvModule("ENV 1", pcb, 42);
             db.innerHTML += createEnvModule("ENV 2", pcb, 54);
             db.innerHTML += createEnvModule("ENV 3", pcb, 66);
             db.innerHTML += createEnvModule("ENV 4", pcb, 78);
 
-            // Filter & Modes
+            // Row 5: Filter, Modes, etc
             db.innerHTML += createFilterModule(pcb);
             db.innerHTML += createModesModule(pcb);
             db.innerHTML += createSplitModule(pcb);
@@ -201,13 +201,12 @@
 
         function createLFOModule(title, pcb, b) {
             const wave = LFO_WAVES[pcb[b+2] & 0x07] || "TRI";
-            const reset = (pcb[b+2] & 0x80) ? "ON" : "OFF";
             return `<div class="module span-4"><div class="module-header">${title}</div><div class="param-grid">
                 <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[b]}</span></div>
                 <div class="cell"><span class="label">WAVE</span><span class="val">${wave}</span></div>
                 <div class="cell"><span class="label">DLY</span><span class="val">${pcb[b+3]}</span></div>
                 <div class="cell"><span class="label">MOD</span><span class="val">${pcb[b+1]}</span></div>
-                <div class="cell"><span class="label">RST</span><span class="val">${reset}</span></div>
+                <div class="cell"><span class="label">RST</span><span class="val">${(pcb[b+2] & 0x80) ? "ON" : "OFF"}</span></div>
             </div></div>`;
         }
 
@@ -237,13 +236,10 @@
         }
 
         function createModesModule(pcb) {
-            const sync = (pcb[40] & 0x01) ? "ON" : "OFF";
-            const am = (pcb[40] & 0x02) ? "ON" : "OFF";
-            const mono = (pcb[40] & 0x04) ? "ON" : "OFF";
             return `<div class="module span-3"><div class="module-header">MODES</div><div class="param-grid">
-                <div class="cell"><span class="label">SYNC</span><span class="val">${sync}</span></div>
-                <div class="cell"><span class="label">AM</span><span class="val">${am}</span></div>
-                <div class="cell"><span class="label">MONO</span><span class="val">${mono}</span></div>
+                <div class="cell"><span class="label">SYNC</span><span class="val">${(pcb[40] & 0x01) ? "ON" : "OFF"}</span></div>
+                <div class="cell"><span class="label">AM</span><span class="val">${(pcb[40] & 0x02) ? "ON" : "OFF"}</span></div>
+                <div class="cell"><span class="label">MONO</span><span class="val">${(pcb[40] & 0x04) ? "ON" : "OFF"}</span></div>
                 <div class="cell" style="grid-column:span 2"><span class="label">GLIDE</span><span class="val">${pcb[41]}</span></div>
             </div></div>`;
         }
