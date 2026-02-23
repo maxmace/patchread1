@@ -7,12 +7,14 @@
         :root {
             --bg: #1a1a1a;
             --panel: #2d2d2d;
-            --accent: #4a90e2; /* Blue */
+            --accent: #4a90e2; 
             --text: #dcdcdc;
             --border: #444;
             --label: #999;
             --esq-gold: #f1c40f;
             --sq80-blue: #3498db;
+            --bank-green: #27ae60;
+            --single-purple: #8e44ad;
         }
 
         body {
@@ -25,7 +27,7 @@
 
         #drop-zone {
             width: 100%;
-            height: 80px;
+            height: 70px;
             border: 2px dashed var(--border);
             border-radius: 10px;
             display: flex;
@@ -38,55 +40,48 @@
             color: var(--accent);
         }
 
+        /* File Info Bar */
         .file-info-bar {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
             margin-bottom: 15px;
             font-size: 14px;
-            padding: 5px 10px;
+            padding: 8px 12px;
             background: #222;
             border-radius: 4px;
         }
 
+        .label-blue { color: var(--accent); font-weight: bold; }
+        
         .type-icon {
             padding: 2px 8px;
             border-radius: 3px;
             font-weight: bold;
             font-size: 10px;
             text-transform: uppercase;
+            color: white;
         }
+        .icon-bank { background: var(--bank-green); }
+        .icon-single { background: var(--single-purple); }
 
-        .icon-bank { background: #27ae60; color: white; }
-        .icon-single { background: #8e44ad; color: white; }
-
+        /* Bank Layout */
         .bank-container {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 20px;
             margin-bottom: 20px;
         }
-
-        /* Hide banks if single patch loaded */
-        .hidden { display: none !important; }
-
         .bank-block { background: #222; border: 1px solid var(--border); padding: 10px; }
         .bank-header { font-weight: bold; color: var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 8px; font-size: 12px; }
         .patch-list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-        
-        .patch-item {
-            font-size: 11px; padding: 6px 2px; background: #2d2d2d; text-align: center; cursor: pointer; border: 1px solid transparent;
-        }
+        .patch-item { font-size: 11px; padding: 6px 2px; background: #2d2d2d; text-align: center; cursor: pointer; border: 1px solid transparent; }
         .patch-item.selected { background: var(--accent); color: #fff; }
 
-        .status-area {
-            margin-bottom: 25px;
-            font-size: 1.2rem;
-            border-top: 1px solid #333;
-            padding-top: 15px;
-        }
+        .hidden { display: none !important; }
 
-        .label-blue { color: var(--accent); font-weight: bold; }
+        /* Status Area */
+        .status-area { margin-bottom: 25px; font-size: 1.2rem; border-top: 1px solid #333; padding-top: 15px; }
         .val-yellow { color: var(--esq-gold); font-weight: bold; }
 
         .synth-type-badge {
@@ -97,16 +92,42 @@
             font-size: 12px;
             font-weight: bold;
         }
-
         .badge-esq { border: 1px solid var(--esq-gold); color: var(--esq-gold); }
         .badge-sq80 { border: 1px solid var(--sq80-blue); color: var(--sq80-blue); }
 
-        .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
-        .module { background: var(--panel); border: 1px solid var(--border); padding: 12px; border-radius: 4px; }
-        .module-header { font-size: 10px; font-weight: bold; color: var(--accent); text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid #444; }
-        .val-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
-        .label { color: var(--label); }
-        .num { color: #5dade2; font-family: monospace; }
+        /* Dashboard Grid */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr); /* 12 units allows easy 3 and 4 splits */
+            gap: 15px;
+        }
+
+        .module {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 4px;
+        }
+
+        /* Responsive spans */
+        .span-4 { grid-column: span 4; } /* For 3-column rows */
+        .span-3 { grid-column: span 3; } /* For 4-column rows */
+
+        .module-header {
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #444;
+        }
+
+        /* 2-Row Parameter layout for OSCs */
+        .param-row { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+        .param-group { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+        .label { color: var(--label); font-size: 10px; text-transform: uppercase; }
+        .num { color: #5dade2; font-family: monospace; font-weight: bold; }
+
     </style>
 </head>
 <body>
@@ -115,8 +136,9 @@
     <input type="file" id="file-input" style="display: none;">
 
     <div id="file-info-bar" class="file-info-bar hidden">
+        <span class="label-blue">FILE NAME: </span>
+        <span id="filename-display" style="color: #eee; margin-right: 10px;"></span>
         <span id="file-type-icon" class="type-icon"></span>
-        <span id="filename-display" style="color: #aaa;"></span>
     </div>
 
     <div id="bank-container" class="bank-container hidden">
@@ -139,6 +161,9 @@
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
 
+        // Logic Helpers
+        const toSigned = (val) => (val & 0x80) ? -(val ^ 0xFF) - 1 : val;
+
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
             dropZone.addEventListener(e, (ev) => { ev.preventDefault(); ev.stopPropagation(); });
         });
@@ -156,11 +181,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        function toSigned(val) {
-            let out = (val & 0x80) ? -(val ^ 0xFF) - 1 : val;
-            return Math.floor(out / 2);
-        }
-
         let patches = [];
 
         function process(data) {
@@ -168,12 +188,10 @@
             for (let i = 5; i < data.length - 1; i += 2) {
                 unpacked.push(((data[i+1] & 0x0F) << 4) | (data[i] & 0x0F));
             }
-
             patches = [];
             const pcbSize = 102;
             const totalPatches = Math.floor(unpacked.length / pcbSize);
 
-            // Set file type icon
             const typeIcon = document.getElementById('file-type-icon');
             const bankContainer = document.getElementById('bank-container');
             
@@ -208,7 +226,11 @@
                     const div = document.createElement('div');
                     div.className = 'patch-item';
                     div.innerText = patches[idx].name;
-                    div.onclick = () => displayParameters(patches[idx]);
+                    div.onclick = () => {
+                        document.querySelectorAll('.patch-item').forEach(e=>e.classList.remove('selected'));
+                        div.classList.add('selected');
+                        displayParameters(patches[idx]);
+                    }
                     list.appendChild(div);
                 }
             }
@@ -217,45 +239,51 @@
         function displayParameters(patch) {
             document.getElementById('status-area').classList.remove('hidden');
             document.getElementById('patch-name-display').innerText = patch.name;
+            const pcb = patch.pcb;
             
-            // Detect SQ-80 vs ESQ
-            // Logic: SQ-80 waves start above 31, or DCA4 depth is used in certain ways
-            let isSQ80 = patch.pcb[88] > 0 || patch.pcb[63] > 31; 
+            // SQ-80 Detection Logic
+            let isSQ80 = pcb[88] > 0 || pcb[63] > 31; 
             const typeBadge = document.getElementById('synth-type-icon');
             typeBadge.innerText = isSQ80 ? "SQ-80" : "ESQ";
             typeBadge.className = isSQ80 ? "synth-type-badge badge-sq80" : "synth-type-badge badge-esq";
 
-            const pcb = patch.pcb;
             const db = document.getElementById('dashboard');
             db.innerHTML = '';
 
-            const createModule = (title, params) => {
-                let html = `<div class="module"><div class="module-header">${title}</div>`;
-                params.forEach(p => html += `<div class="val-row"><span class="label">${p.l}</span><span class="num">${p.v}</span></div>`);
-                return html + `</div>`;
-            };
+            // ROW 1: OSCILLATORS (3 modules, full width)
+            for(let i=1; i<=3; i++) {
+                let base = 58 + (i-1)*10;
+                let semi = pcb[base] & 0x7F;
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">OSC ${i}</div>
+                        <div class="param-row">
+                            <div class="param-group"><span class="label">OCT</span><span class="num">${Math.floor(semi/12)-3}</span></div>
+                            <div class="param-group"><span class="label">SEMI</span><span class="num">${semi%12}</span></div>
+                            <div class="param-group"><span class="label">FINE</span><span class="num">${pcb[base+1]}</span></div>
+                            <div class="param-group"><span class="label">WAVE</span><span class="num">${pcb[base+5]}</span></div>
+                        </div>
+                        <div class="param-row">
+                            <div class="param-group"><span class="label">MOD 1</span><span class="num">${MODS[pcb[base+2]&0x0F]} ${toSigned(pcb[base+3])}</span></div>
+                            <div class="param-group"><span class="label">MOD 2</span><span class="num">${MODS[pcb[base+2]>>4]} ${toSigned(pcb[base+4])}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
 
-            // Layout mapping (5-row structure)
-            // Row 1: OSCs
-            for(let i=1; i<=3; i++) db.innerHTML += createModule(`OSC ${i}`, [{l:'WAVE',v:pcb[58+(i*10)-2]}]); // Offset simplified for example
-            db.innerHTML += `<div></div>`; 
+            // ROW 2: DCAs (Generic placeholder for now)
+            for(let i=1; i<=3; i++) db.innerHTML += `<div class="module span-4"><div class="module-header">DCA ${i}</div></div>`;
+            
+            // ROW 3: LFOs (Generic placeholder for now)
+            for(let i=1; i<=3; i++) db.innerHTML += `<div class="module span-4"><div class="module-header">LFO ${i}</div></div>`;
 
-            // Row 2: DCAs
-            for(let i=1; i<=3; i++) db.innerHTML += createModule(`DCA ${i}`, [{l:'LVL',v:pcb[64+(i*10)-2]}]);
-            db.innerHTML += `<div></div>`;
+            // ROW 4: ENVs (4 modules)
+            for(let i=1; i<=4; i++) db.innerHTML += `<div class="module span-3"><div class="module-header">ENV ${i}</div></div>`;
 
-            // Row 3: LFOs
-            for(let i=1; i<=3; i++) db.innerHTML += createModule(`LFO ${i}`, [{l:'FRQ',v:pcb[46+((i-1)*4)]}]);
-            db.innerHTML += `<div></div>`;
-
-            // Row 4: ENVs
-            for(let i=1; i<=4; i++) db.innerHTML += createModule(`ENV ${i}`, [{l:'L1',v:toSigned(pcb[6+((i-1)*10)])}]);
-
-            // Row 5: Bottom
-            db.innerHTML += createModule('FILTER', [{l:'FRQ',v:pcb[89]}]);
-            db.innerHTML += createModule('MODES', [{l:'SYNC',v:pcb[96]}]);
-            db.innerHTML += createModule('SPLIT/LAYER', [{l:'MODE',v:pcb[98]}]);
-            db.innerHTML += createModule('DCA 4', [{l:'AMT',v:pcb[88]}]);
+            // ROW 5: Bottom (4 modules)
+            ['FILTER','MODES','SPLIT/LAYER','DCA 4'].forEach(title => {
+                db.innerHTML += `<div class="module span-3"><div class="module-header">${title}</div></div>`;
+            });
         }
     </script>
 </body>
