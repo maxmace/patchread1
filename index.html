@@ -12,21 +12,16 @@
             --border: #333;
             --label: #777;
             --esq-gold: #f1c40f;
-            
-            /* Stepped Blue-Teal Palette */
-            --sq80-fixed: #3498db;   /* Level 1+2+3: Solid Blue */
-            --sq80-prob: #1abc9c;    /* Level 1/2: Teal */
-            --sq80-poss: #16a085;    /* Level 3: Deep Teal */
-            
+            --sq80-fixed: #3498db;
+            --sq80-prob: #1abc9c;
+            --sq80-poss: #16a085;
             --glass: rgba(255, 255, 255, 0.03);
         }
 
         body {
             font-family: 'Inter', -apple-system, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
+            background-color: var(--bg); color: var(--text);
+            margin: 0; padding: 20px;
         }
 
         #drop-zone {
@@ -58,7 +53,6 @@
             background: linear-gradient(to right, #1a1a1a, #121212);
         }
 
-        /* Detection Badges */
         .synth-type-badge {
             display: inline-block; margin-left: 15px; padding: 4px 12px; border-radius: 4px;
             font-size: 10px; font-weight: 800; text-transform: uppercase;
@@ -75,14 +69,15 @@
         .module-header { background: var(--glass); font-size: 10px; font-weight: 800; color: var(--accent); padding: 8px 12px; border-bottom: 1px solid var(--border); }
 
         .param-grid-row { display: flex; border-bottom: 1px solid var(--border); }
-        .cell { flex: 1; padding: 10px 4px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .param-grid-row:last-child { border-bottom: none; }
+        .cell { flex: 1; padding: 8px 4px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
         .cell:last-child { border-right: none; }
         
-        .label { font-size: 9px; color: var(--label); text-transform: uppercase; margin-bottom: 4px; }
-        .num { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
-        .wave-num { font-size: 9px; color: var(--accent); opacity: 0.8; margin-bottom: 1px; font-weight: bold; }
+        .label { font-size: 9px; color: var(--label); text-transform: uppercase; margin-bottom: 2px; }
+        .num { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
+        .mod-text { color: #fff; font-size: 11px; font-weight: bold; }
+        .wave-num { font-size: 9px; color: var(--accent); opacity: 0.8; font-weight: bold; }
         .wave-name { color: #fff; font-size: 11px; font-weight: bold; }
-        .src { color: #aaa; font-size: 10px; font-weight: bold; margin-bottom: 2px; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -114,12 +109,7 @@
 
     <script>
         const MODS = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL-X", "KBD", "KBD2", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
-        
-        // Full Wave Table Mapping
-        const WAVES = [
-            "SAW", "BELL", "SINE", "SQUARE", "PULSE", "NOISE 1", "NOISE 2", "NOISE 3", "BASS", "PIANO", "EL PNO", "VOICE 1", "VOICE 2", "KICK", "REED", "ORGAN", "SYNTH 1", "SYNTH 2", "SYNTH 3", "FORMT 1", "FORMT 2", "FORMT 3", "FORMT 4", "FORMT 5", "PULSE2", "SQR 2", "4 OCTS", "PRIME", "BASS 2", "E PNO2", "OCTAVE", "OCT+5", "SAW 2", "TRIANG", "REED 2", "REED 3", "GRIT 1", "GRIT 2", "GRIT 3", "GLINT 1", "GLINT 2", "GLINT 3", "CLAV", "BRASS", "STRING", "DIGIT 1", "DIGIT 2", "BELL 2", "ALIEN", "BREATH", "VOICE 3", "STEAM", "METAL", "CHIME", "BOWING", "PICK 1", "PICK 2", "MALLET", "SLAP", "PLINK", "PLUCK", "PLUNK", "CLICK", "CHIFF", "THUMP", "LOGDRM", "KICK 2", "SNARE", "TOMTOM", "HI HAT", "DRUMS 1", "DRUMS 2", "DRUMS 3", "DRUMS 4", "DRUMS 5"
-        ];
-        // Pad the rest with WAV075...WAV255
+        const WAVES = ["SAW", "BELL", "SINE", "SQUARE", "PULSE", "NOISE 1", "NOISE 2", "NOISE 3", "BASS", "PIANO", "EL PNO", "VOICE 1", "VOICE 2", "KICK", "REED", "ORGAN", "SYNTH 1", "SYNTH 2", "SYNTH 3", "FORMT 1", "FORMT 2", "FORMT 3", "FORMT 4", "FORMT 5", "PULSE2", "SQR 2", "4 OCTS", "PRIME", "BASS 2", "E PNO2", "OCTAVE", "OCT+5", "SAW 2", "TRIANG", "REED 2", "REED 3", "GRIT 1", "GRIT 2", "GRIT 3", "GLINT 1", "GLINT 2", "GLINT 3", "CLAV", "BRASS", "STRING", "DIGIT 1", "DIGIT 2", "BELL 2", "ALIEN", "BREATH", "VOICE 3", "STEAM", "METAL", "CHIME", "BOWING", "PICK 1", "PICK 2", "MALLET", "SLAP", "PLINK", "PLUCK", "PLUNK", "CLICK", "CHIFF", "THUMP", "LOGDRM", "KICK 2", "SNARE", "TOMTOM", "HI HAT", "DRUMS 1", "DRUMS 2", "DRUMS 3", "DRUMS 4", "DRUMS 5"];
         for(let i=75; i<=255; i++) { WAVES.push("WAV" + (i+1).toString().padStart(3, '0')); }
 
         const dropZone = document.getElementById('drop-zone');
@@ -187,7 +177,7 @@
             document.getElementById('patch-name-display').innerText = patch.name;
             const pcb = patch.pcb;
 
-            // --- 3-LEVEL DETECTION ---
+            // Detection Logic
             let lvl1 = false, lvl2 = false, lvl3 = false;
             for(let e=0; e<4; e++) {
                 let base = 6 + (e * 10);
@@ -197,19 +187,15 @@
             if (pcb[63] > 31 || pcb[73] > 31 || pcb[83] > 31) lvl3 = true;
 
             const badge = document.getElementById('synth-type-icon');
-            if (lvl1 && lvl2 && lvl3) {
-                badge.innerText = "SQ-80"; badge.className = "synth-type-badge badge-sq80";
-            } else if (lvl1 || lvl2) {
-                badge.innerText = "PROBABLE SQ-80"; badge.className = "synth-type-badge badge-sq80-prob";
-            } else if (lvl3) {
-                badge.innerText = "POSSIBLE SQ-80 / HIDDEN WAVE"; badge.className = "synth-type-badge badge-sq80-poss";
-            } else {
-                badge.innerText = "ESQ-1"; badge.className = "synth-type-badge badge-esq";
-            }
+            if (lvl1 && lvl2 && lvl3) { badge.innerText = "SQ-80"; badge.className = "synth-type-badge badge-sq80"; }
+            else if (lvl1 || lvl2) { badge.innerText = "PROBABLE SQ-80"; badge.className = "synth-type-badge badge-sq80-prob"; }
+            else if (lvl3) { badge.innerText = "POSSIBLE SQ-80 / HIDDEN WAVE"; badge.className = "synth-type-badge badge-sq80-poss"; }
+            else { badge.innerText = "ESQ-1"; badge.className = "synth-type-badge badge-esq"; }
 
             const db = document.getElementById('dashboard');
             db.innerHTML = '';
 
+            // ROW 1: OSCILLATORS
             for(let i=1; i<=3; i++) {
                 let base = 58 + (i-1)*10;
                 let semi = pcb[base] & 0x7F;
@@ -221,27 +207,39 @@
                             <div class="cell"><span class="label">OCT</span><span class="num">${Math.floor(semi/12)-3}</span></div>
                             <div class="cell"><span class="label">SEMI</span><span class="num">${semi%12}</span></div>
                             <div class="cell"><span class="label">FINE</span><span class="num">${pcb[base+1]}</span></div>
-                            <div class="cell">
-                                <span class="label">WAVE</span>
-                                <span class="wave-num">WAVE ${wIdx + 1}</span>
-                                <span class="wave-name">${WAVES[wIdx] || "---"}</span>
-                            </div>
+                            <div class="cell"><span class="label">WAVE</span><span class="wave-num">WAVE ${wIdx + 1}</span><span class="wave-name">${WAVES[wIdx] || "---"}</span></div>
                         </div>
                         <div class="param-grid-row">
-                            <div class="cell"><span class="label">MOD 1</span><span class="src">${MODS[pcb[base+2]&0x0F]}</span><span class="num">${toSigned(pcb[base+3])}</span></div>
-                            <div class="cell"><span class="label">MOD 2</span><span class="src">${MODS[pcb[base+2]>>4]}</span><span class="num">${toSigned(pcb[base+4])}</span></div>
+                            <div class="cell"><span class="label">MOD 1</span><span class="mod-text">${MODS[pcb[base+2]&0x0F]} * ${toSigned(pcb[base+3])}</span></div>
+                            <div class="cell"><span class="label">MOD 2</span><span class="mod-text">${MODS[pcb[base+2]>>4]} * ${toSigned(pcb[base+4])}</span></div>
                         </div>
                     </div>
                 `;
             }
 
-            // Standard layout placeholders
-            for(let i=0; i<3; i++) db.innerHTML += `<div class="module span-4"><div class="module-header">DCA ${i+1}</div></div>`;
+            // ROW 2: DCAs
+            for(let i=1; i<=3; i++) {
+                let base = 64 + (i-1)*10;
+                let outputVal = (pcb[base+5] & 0x01) ? "ON" : "OFF"; // Assuming bit 0 for output on/off
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">DCA AMPLIFIER ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">LEVEL</span><span class="num">${pcb[base]}</span></div>
+                            <div class="cell"><span class="label">OUTPUT</span><span class="num">${outputVal}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">MOD 1</span><span class="mod-text">${MODS[pcb[base+1]&0x0F]} * ${toSigned(pcb[base+2])}</span></div>
+                            <div class="cell"><span class="label">MOD 2</span><span class="mod-text">${MODS[pcb[base+1]>>4]} * ${toSigned(pcb[base+3])}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Placeholders for Rows 3-5
             for(let i=0; i<3; i++) db.innerHTML += `<div class="module span-4"><div class="module-header">LFO ${i+1}</div></div>`;
             for(let i=0; i<4; i++) db.innerHTML += `<div class="module span-3"><div class="module-header">ENV ${i+1}</div></div>`;
-            ['FILTER','MODES','SPLIT/LAYER','DCA 4'].forEach(t => {
-                db.innerHTML += `<div class="module span-3"><div class="module-header">${t}</div></div>`;
-            });
+            ['FILTER','MODES','SPLIT/LAYER','DCA 4'].forEach(t => db.innerHTML += `<div class="module span-3"><div class="module-header">${t}</div></div>`);
         }
     </script>
 </body>
