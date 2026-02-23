@@ -40,6 +40,8 @@
 
         .label-blue { color: var(--accent); font-weight: 600; text-transform: uppercase; font-size: 11px; }
         .type-icon { padding: 3px 10px; border-radius: 4px; font-weight: bold; font-size: 10px; color: white; }
+        .icon-bank { background: #27ae60; }
+        .icon-single { background: #8e44ad; }
 
         .bank-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px; }
         .bank-block { background: var(--panel); border: 1px solid var(--border); padding: 15px; border-radius: 8px; }
@@ -59,53 +61,44 @@
         }
         .badge-esq { background: rgba(241, 196, 15, 0.1); color: var(--esq-gold); border: 1px solid var(--esq-gold); }
         .badge-sq80 { background: rgba(52, 152, 219, 0.1); color: var(--sq80-fixed); border: 1px solid var(--sq80-fixed); }
+        .badge-sq80-prob { background: rgba(26, 188, 156, 0.1); color: var(--sq80-prob); border: 1px solid var(--sq80-prob); }
+        .badge-sq80-poss { background: rgba(22, 160, 133, 0.1); color: var(--sq80-poss); border: 1px solid var(--sq80-poss); }
         .badge-hidden { background: rgba(0, 210, 255, 0.1); color: var(--hidden-wave); border: 1px solid var(--hidden-wave); }
 
         .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 15px; }
-        
-        /* Tooltip fix: Removed overflow:hidden */
         .module { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; position: relative; }
         .span-4 { grid-column: span 4; }
         .span-3 { grid-column: span 3; }
-        
         .module-header { background: var(--glass); font-size: 10px; font-weight: 800; color: var(--accent); padding: 8px 12px; border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0; }
 
         .param-grid-row { display: flex; border-bottom: 1px solid var(--border); }
         .param-grid-row:last-child { border-bottom: none; }
-        
-        .cell { 
-            flex: 1; padding: 8px 4px; border-right: 1px solid var(--border); 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            text-align: center; position: relative; cursor: help;
-        }
+        .cell { flex: 1; padding: 8px 4px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; position: relative; cursor: help; }
         .cell:last-child { border-right: none; }
         
         .label { font-size: 9px; color: var(--label); text-transform: uppercase; margin-bottom: 2px; }
         .num { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
         
-        /* Mod Star Centering */
         .mod-container { display: flex; align-items: center; justify-content: center; }
-        .mod-src { color: #aaa; font-size: 10px; font-weight: 600; }
-        .mod-star { 
-            color: var(--label); font-size: 18px; font-weight: bold; padding: 0 8px; 
-            display: inline-block; transform: translateY(20%); user-select: none;
-        }
-        .mod-val { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: bold; }
+        .mod-src { color: #aaa; font-size: 11px; font-weight: 600; }
+        .mod-star { color: var(--label); font-size: 20px; font-weight: bold; padding: 0 12px; display: inline-block; transform: translateY(20%); user-select: none; }
+        .mod-val { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: bold; }
 
-        /* Tooltip Logic: Higher z-index and overflow handling */
+        .wave-num { font-size: 9px; color: var(--accent); opacity: 0.8; font-weight: bold; }
+        .wave-name { color: #fff; font-size: 11px; font-weight: bold; }
+
+        /* Tooltip Logic */
         .cell::after {
             content: attr(data-tooltip);
             position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-10px);
-            width: 200px; padding: 12px; border-radius: 6px;
+            width: 220px; padding: 12px; border-radius: 6px;
             background: var(--tooltip-bg); color: #fff; font-size: 11px; line-height: 1.4;
             text-align: left; visibility: hidden; opacity: 0; z-index: 1000;
             box-shadow: 0 8px 24px rgba(0,0,0,0.6); pointer-events: none;
-            white-space: pre-wrap; transition: opacity 0.2s;
-            border: 1px solid rgba(255,255,255,0.1);
+            white-space: pre-wrap; transition: opacity 0.2s; border: 1px solid rgba(255,255,255,0.1);
         }
         .cell:hover { z-index: 1001; }
         .cell:hover::after { visibility: visible; opacity: 1; }
-
         .hidden { display: none !important; }
     </style>
 </head>
@@ -123,6 +116,8 @@
     <div id="bank-container" class="bank-container hidden">
         <div class="bank-block"><div class="bank-header">INT 1</div><div id="bank-0" class="patch-list"></div></div>
         <div class="bank-block"><div class="bank-header">INT 2</div><div id="bank-1" class="patch-list"></div></div>
+        <div class="bank-block"><div class="bank-header">INT 3</div><div id="bank-2" class="patch-list"></div></div>
+        <div class="bank-block"><div class="bank-header">INT 4</div><div id="bank-3" class="patch-list"></div></div>
     </div>
 
     <div id="status-area" class="status-area hidden">
@@ -161,8 +156,19 @@
                 </div>
             </div>`;
 
+        let patches = [];
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('drop', e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
+
         function handleFile(file) {
             if (!file) return;
+            document.getElementById('filename-display').innerText = file.name.toUpperCase();
+            document.getElementById('file-info-bar').classList.remove('hidden');
             const reader = new FileReader();
             reader.onload = (ev) => process(new Uint8Array(ev.target.result));
             reader.readAsArrayBuffer(file);
@@ -173,29 +179,43 @@
             for (let i = 5; i < data.length - 1; i += 2) {
                 unpacked.push(((data[i+1] & 0x0F) << 4) | (data[i] & 0x0F));
             }
+            patches = [];
             const pcbSize = 102;
             const total = Math.floor(unpacked.length / pcbSize);
-            let patches = [];
+
+            document.getElementById('bank-container').classList.toggle('hidden', total <= 1);
+            const typeIcon = document.getElementById('file-type-icon');
+            typeIcon.innerText = total > 1 ? "BANK" : "SINGLE PATCH";
+            typeIcon.className = total > 1 ? "type-icon icon-bank" : "type-icon icon-single";
+
             for (let i = 0; i < total; i++) {
                 let pcb = unpacked.slice(i * pcbSize, (i + 1) * pcbSize);
                 let name = "";
                 for(let n=0; n<6; n++) { name += String.fromCharCode(pcb[n] & 0x7F); }
                 patches.push({ name: name.trim(), pcb: pcb });
             }
-            renderBanks(patches);
+            renderBanks();
             if (patches.length > 0) displayParameters(patches[0]);
         }
 
-        function renderBanks(patches) {
-            const list0 = document.getElementById('bank-0');
-            list0.innerHTML = '';
-            patches.slice(0, 40).forEach((p, i) => {
-                const div = document.createElement('div');
-                div.className = 'patch-item';
-                div.innerText = p.name;
-                div.onclick = () => displayParameters(p);
-                list0.appendChild(div);
-            });
+        function renderBanks() {
+            for (let b = 0; b < 4; b++) {
+                const list = document.getElementById(`bank-${b}`);
+                list.innerHTML = '';
+                for (let p = 0; p < 10; p++) {
+                    const idx = (b * 10) + p;
+                    if (!patches[idx]) break;
+                    const div = document.createElement('div');
+                    div.className = 'patch-item';
+                    div.innerText = patches[idx].name;
+                    div.onclick = () => {
+                        document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
+                        div.classList.add('selected');
+                        displayParameters(patches[idx]);
+                    };
+                    list.appendChild(div);
+                }
+            }
         }
 
         function displayParameters(patch) {
@@ -205,9 +225,60 @@
             const db = document.getElementById('dashboard');
             db.innerHTML = '';
 
-            // ... (Oscillators and DCAs simplified for brevity here, same as before) ...
-            
-            // ROW 3: LFOs (With tooltips)
+            // Patch Detection Logic
+            let hasHidden = (pcb[63] >= 74 || pcb[73] >= 74 || pcb[83] >= 74);
+            let lvl1 = false, lvl2 = false, lvl3 = false;
+            for(let e=0; e<4; e++) {
+                let base = 6 + (e * 10);
+                if (pcb[base+9] & 0x80) lvl1 = true;
+                if (pcb[base+2] & 0x80) lvl2 = true;
+            }
+            if (pcb[63] > 31 || pcb[73] > 31 || pcb[83] > 31) lvl3 = true;
+            const badge = document.getElementById('synth-type-icon');
+            if (hasHidden) { badge.innerText = "HIDDEN WAVE"; badge.className = "synth-type-badge badge-hidden"; }
+            else if (lvl1 && lvl2 && lvl3) { badge.innerText = "SQ-80"; badge.className = "synth-type-badge badge-sq80"; }
+            else if (lvl1 || lvl2) { badge.innerText = "PROBABLE SQ-80"; badge.className = "synth-type-badge badge-sq80-prob"; }
+            else { badge.innerText = "ESQ-1"; badge.className = "synth-type-badge badge-esq"; }
+
+            // ROW 1: OSCILLATORS
+            for(let i=1; i<=3; i++) {
+                let base = 58 + (i-1)*10;
+                let semi = pcb[base] & 0x7F;
+                let wIdx = pcb[base+5];
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">OSCILLATOR ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">OCT</span><span class="num">${Math.floor(semi/12)-3}</span></div>
+                            <div class="cell"><span class="label">SEMI</span><span class="num">${semi%12}</span></div>
+                            <div class="cell"><span class="label">FINE</span><span class="num">${pcb[base+1]}</span></div>
+                            <div class="cell"><span class="label">WAVE</span><span class="wave-num">W ${wIdx+1}</span><span class="wave-name">${WAVES[wIdx] || "---"}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            ${renderMod('MOD 1', pcb[base+2]&0x0F, pcb[base+3], "")}
+                            ${renderMod('MOD 2', pcb[base+2]>>4, pcb[base+4], "")}
+                        </div>
+                    </div>`;
+            }
+
+            // ROW 2: DCAs
+            for(let i=1; i<=3; i++) {
+                let base = 64 + (i-1)*10;
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">DCA AMPLIFIER ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">LEVEL</span><span class="num">${pcb[base]}</span></div>
+                            <div class="cell"><span class="label">OUTPUT</span><span class="num">${(pcb[base+5]&0x01)?"ON":"OFF"}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            ${renderMod('MOD 1', pcb[base+1]&0x0F, pcb[base+2], "")}
+                            ${renderMod('MOD 2', pcb[base+1]>>4, pcb[base+3], "")}
+                        </div>
+                    </div>`;
+            }
+
+            // ROW 3: LFOs
             for(let i=1; i<=3; i++) {
                 let base = 36 + (i-1)*6; 
                 let wIdx = (pcb[base+1]>>2)&0x03;
@@ -221,15 +292,15 @@
                             <div class="cell" data-tooltip="${LFO_HINTS.wav}"><span class="label">WAV</span><span class="wave-name">${["TRI","SAW","SQR","NOISE"][wIdx]}</span></div>
                         </div>
                         <div class="param-grid-row">
-                            <div class="cell" data-tooltip="${LFO_HINTS.l1}"><span class="label">L1</span><span class="num">${pcb[base+5]}</span></div>
+                            <div class="cell" data-tooltip="${LFO_HINTS.l1}"><span class="label">LEVEL 1</span><span class="num">${pcb[base+5]}</span></div>
                             <div class="cell" data-tooltip="${LFO_HINTS.delay}"><span class="label">DELAY</span><span class="num">${pcb[base+2]}</span></div>
-                            <div class="cell" data-tooltip="${LFO_HINTS.l2}"><span class="label">L2</span><span class="num">${pcb[base+5]}</span></div>
+                            <div class="cell" data-tooltip="${LFO_HINTS.l2}"><span class="label">LEVEL 2</span><span class="num">${pcb[base+5]}</span></div>
                             ${renderMod('MOD', pcb[base+3]&0x0F, pcb[base+4], LFO_HINTS.mod)}
                         </div>
                     </div>`;
             }
 
-            // ROW 4: ENVELOPES (New Implementation)
+            // ROW 4: ENVELOPES
             for(let i=1; i<=4; i++) {
                 let base = 6 + (i-1)*10;
                 db.innerHTML += `
@@ -254,8 +325,6 @@
                     </div>`;
             }
         }
-        document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
-        document.getElementById('file-input').onchange = (e) => handleFile(e.target.files[0]);
     </script>
 </body>
 </html>
