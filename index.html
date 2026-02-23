@@ -6,22 +6,25 @@
     <style>
         :root { --bg: #121212; --panel: #1e1e1e; --module: #2a2a2a; --accent: #0078d4; --text: #e0e0e0; --label: #888; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; }
-        #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; border-bottom: 2px solid #333; justify-content: space-between; }
+        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; background: var(--panel); cursor: pointer; border-radius: 8px; margin-bottom: 15px; border: 2px dashed #444; transition: 0.2s; }
+        #drop-zone:hover { border-color: var(--accent); background: #252525; }
+        #status-bar { background: var(--panel); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; border-bottom: 2px solid #333; justify-content: space-between; align-items: center; }
         .bank-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .bank-container { background: #181818; padding: 10px; border-radius: 6px; border: 1px solid #333; }
-        .bank-header { font-weight: bold; color: var(--accent); margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #333; }
+        .bank-header { font-weight: bold; color: var(--accent); margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 4px; }
         .patch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-        .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; min-height: 20px;}
-        .patch-item.selected { background: var(--accent); color: white; }
+        .patch-item { background: var(--panel); padding: 8px 4px; border-radius: 3px; cursor: pointer; text-align: center; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; transition: 0.1s; }
+        .patch-item:hover { border-color: #666; }
+        .patch-item.selected { background: var(--accent); color: white; border-color: #fff; }
         .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; margin-top: 20px; display: none; }
         .span-4 { grid-column: span 4; } .span-3 { grid-column: span 3; }
-        .module { background: var(--module); border-radius: 6px; border: 1px solid #444; overflow: hidden; }
-        .module-header { background: #333; padding: 6px 12px; font-size: 0.75rem; font-weight: bold; color: #aaa; }
+        .module { background: var(--module); border-radius: 6px; border: 1px solid #444; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .module-header { background: #333; padding: 6px 12px; font-size: 0.75rem; font-weight: bold; color: #aaa; border-bottom: 1px solid #444; }
         .param-grid { display: grid; grid-template-columns: 50px repeat(4, 1fr); }
         .cell { border: 1px solid #333; padding: 6px; font-family: monospace; }
-        .label { color: var(--label); font-size: 0.6rem; display: block; }
-        .val { color: #fff; font-weight: bold; }
+        .label { color: var(--label); font-size: 0.6rem; display: block; text-transform: uppercase; }
+        .val { color: #fff; font-weight: bold; font-size: 0.9rem; }
+        .mod-row { background: rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
@@ -31,6 +34,7 @@
 
     <div id="status-bar">
         <span id="file-info">Ready</span>
+        <div id="model-badge"></div>
     </div>
 
     <div id="bank-view" class="bank-wrapper"></div>
@@ -44,8 +48,6 @@
 
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = (e) => handleFiles(e.target.files);
-        
-        // Prevent browser from opening file
         window.addEventListener("dragover", e => e.preventDefault());
         window.addEventListener("drop", e => { e.preventDefault(); handleFiles(e.dataTransfer.files); });
 
@@ -57,15 +59,13 @@
             reader.readAsArrayBuffer(file);
         }
 
-        /**
-         * SQ-80 bit-stream unpacking.
-         * Converts 2*102 MIDI bytes into 102 internal bytes.
-         */
         function unpackSQ80(data, start) {
             let pcb = new Uint8Array(102);
+            // Sliding the offset by 1 byte to correct the "xs" alignment
+            let adjustedStart = start + 1; 
             for (let i = 0; i < 102; i++) {
-                let low = data[start + (i * 2)] & 0x0F;
-                let high = data[start + (i * 2) + 1] & 0x0F;
+                let low = data[adjustedStart + (i * 2)] & 0x0F;
+                let high = data[adjustedStart + (i * 2) + 1] & 0x0F;
                 pcb[i] = (high << 4) | low;
             }
             return pcb;
@@ -87,16 +87,16 @@
             dashboard.style.display = 'none';
 
             let patches = [];
-            // SQ-80 specific: Offset 10 is the first patch after F0 0F 03 00 00 00 00 00 00 00
             const isBank = data.length > 1000;
             const count = isBank ? 40 : 1;
+            // The header is usually 10 bytes: F0 0F 03 00 ...
+            const headerOffset = 10;
 
             for (let i = 0; i < count; i++) {
-                const offset = 10 + (i * 204); 
-                if (offset + 200 > data.length) break;
-                
+                const offset = headerOffset + (i * 204); 
+                if (offset + 204 > data.length) break;
                 const pcb = unpackSQ80(data, offset);
-                patches.push({ pcb, name: extractName(pcb) || "PATCH " + (i+1) });
+                patches.push({ pcb, name: extractName(pcb) });
             }
 
             document.getElementById('file-info').innerText = `${filename} (${patches.length} Patches)`;
@@ -106,9 +106,15 @@
         function renderView(patches, isBank) {
             const bankView = document.getElementById('bank-view');
             if (!isBank) {
-                bankView.innerHTML = '<div class="bank-container" id="single-bank"></div>';
-                document.getElementById('single-bank').appendChild(createPatchElement(patches[0]));
-                document.querySelector('.patch-item').click();
+                const solo = document.createElement('div');
+                solo.className = 'bank-container';
+                solo.style.gridColumn = "span 2";
+                const grid = document.createElement('div');
+                grid.className = 'patch-grid';
+                grid.appendChild(createPatchElement(patches[0]));
+                solo.appendChild(grid);
+                bankView.appendChild(solo);
+                grid.firstChild.click();
                 return;
             }
 
@@ -118,7 +124,6 @@
                 container.innerHTML = `<div class="bank-header">INT ${b+1}</div>`;
                 const grid = document.createElement('div');
                 grid.className = 'patch-grid';
-                
                 for (let p = 0; p < 10; p++) {
                     const idx = (b * 10) + p;
                     if (patches[idx]) grid.appendChild(createPatchElement(patches[idx]));
@@ -131,7 +136,7 @@
         function createPatchElement(patch) {
             const div = document.createElement('div');
             div.className = 'patch-item';
-            div.innerText = patch.name;
+            div.innerText = patch.name || "UNTITLED";
             div.onclick = () => {
                 document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
                 div.classList.add('selected');
@@ -146,15 +151,32 @@
             db.style.display = 'grid';
             db.innerHTML = '';
             
-            // Re-using the creation functions from before
+            // OSC Section
             db.innerHTML += createOscModule("OSC 1", pcb, 0, 12);
             db.innerHTML += createOscModule("OSC 2", pcb, 5, 16);
             db.innerHTML += createOscModule("OSC 3", pcb, 10, 20);
+
+            // DCA Section
             db.innerHTML += createDCAModule("DCA 1", pcb, 14);
             db.innerHTML += createDCAModule("DCA 2", pcb, 18);
             db.innerHTML += createDCAModule("DCA 3", pcb, 22);
-            // ... (rest of modules)
-            db.innerHTML += `<div>Data check: ${pcb.slice(94,100).join(', ')}</div>`;
+
+            // LFO Section
+            db.innerHTML += createLFOModule("LFO 1", pcb, 28);
+            db.innerHTML += createLFOModule("LFO 2", pcb, 32);
+            db.innerHTML += createLFOModule("LFO 3", pcb, 36);
+
+            // Env Section
+            db.innerHTML += createEnvModule("ENV 1", pcb, 42);
+            db.innerHTML += createEnvModule("ENV 2", pcb, 54);
+            db.innerHTML += createEnvModule("ENV 3", pcb, 66);
+            db.innerHTML += createEnvModule("ENV 4", pcb, 78);
+
+            // Filter & Modes
+            db.innerHTML += createFilterModule(pcb);
+            db.innerHTML += createModesModule(pcb);
+            db.innerHTML += createSplitModule(pcb);
+            db.innerHTML += createDCAModule("DCA 4 (PAN)", pcb, 90);
         }
 
         function createOscModule(title, pcb, b, m) {
@@ -163,12 +185,73 @@
                 <div class="cell"><span class="label">OCT</span><span class="val">${((pcb[b+1] >> 4) & 0x0F) - 3}</span></div>
                 <div class="cell"><span class="label">SEMI</span><span class="val">${pcb[b+1] & 0x0F}</span></div>
                 <div class="cell" style="grid-column:span 2"><span class="label">FINE</span><span class="val">${pcb[b+2]}</span></div>
+                <div class="cell mod-row">MODS</div>
+                <div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m]]}</span><span class="val">${(pcb[m+1] << 24 >> 24)}</span></div>
+                <div class="cell mod-row" style="grid-column:span 2"><span class="label">${MOD_SOURCES[pcb[m+2]]}</span><span class="val">${(pcb[m+3] << 24 >> 24)}</span></div>
             </div></div>`;
         }
 
         function createDCAModule(title, pcb, b) {
             return `<div class="module span-4"><div class="module-header">${title}</div><div class="param-grid">
                 <div class="cell">LVL</div><div class="cell" style="grid-column:span 4"><span class="val">${pcb[b]}</span></div>
+                <div class="cell mod-row">MOD</div><div class="cell mod-row" style="grid-column:span 2"><span class="label">SRC</span><span class="val">${MOD_SOURCES[pcb[b+1]]}</span></div>
+                <div class="cell mod-row" style="grid-column:span 2"><span class="label">AMT</span><span class="val">${(pcb[b+2] << 24 >> 24)}</span></div>
+            </div></div>`;
+        }
+
+        function createLFOModule(title, pcb, b) {
+            const wave = LFO_WAVES[pcb[b+2] & 0x07] || "TRI";
+            const reset = (pcb[b+2] & 0x80) ? "ON" : "OFF";
+            return `<div class="module span-4"><div class="module-header">${title}</div><div class="param-grid">
+                <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[b]}</span></div>
+                <div class="cell"><span class="label">WAVE</span><span class="val">${wave}</span></div>
+                <div class="cell"><span class="label">DLY</span><span class="val">${pcb[b+3]}</span></div>
+                <div class="cell"><span class="label">MOD</span><span class="val">${pcb[b+1]}</span></div>
+                <div class="cell"><span class="label">RST</span><span class="val">${reset}</span></div>
+            </div></div>`;
+        }
+
+        function createEnvModule(title, pcb, b) {
+            return `<div class="module span-3"><div class="module-header">${title}</div><div class="param-grid">
+                <div class="cell"><span class="label">L1</span><span class="val">${pcb[b]}</span></div>
+                <div class="cell"><span class="label">L2</span><span class="val">${pcb[b+2]}</span></div>
+                <div class="cell"><span class="label">L3</span><span class="val">${pcb[b+4]}</span></div>
+                <div class="cell"><span class="label">LV</span><span class="val">${pcb[b+10]}</span></div><div class="cell"></div>
+                <div class="cell mod-row"><span class="label">T1</span><span class="val">${pcb[b+1]}</span></div>
+                <div class="cell mod-row"><span class="label">T2</span><span class="val">${pcb[b+3]}</span></div>
+                <div class="cell mod-row"><span class="label">T3</span><span class="val">${pcb[b+5]}</span></div>
+                <div class="cell mod-row"><span class="label">T4</span><span class="val">${pcb[b+6]}</span></div><div class="cell mod-row"></div>
+            </div></div>`;
+        }
+
+        function createFilterModule(pcb) {
+            return `<div class="module span-3"><div class="module-header">FILTER</div><div class="param-grid">
+                <div class="cell"><span class="label">FREQ</span><span class="val">${pcb[20]}</span></div>
+                <div class="cell"><span class="label">RES</span><span class="val">${pcb[21]}</span></div>
+                <div class="cell"><span class="label">KYB</span><span class="val">${pcb[23]}</span></div><div class="cell" style="grid-column:span 2"></div>
+                <div class="cell mod-row"><span class="label">MOD1</span><span class="val">${MOD_SOURCES[pcb[24]]}</span></div>
+                <div class="cell mod-row"><span class="label">AMT</span><span class="val">${(pcb[25] << 24 >> 24)}</span></div>
+                <div class="cell mod-row"><span class="label">MOD2</span><span class="val">${MOD_SOURCES[pcb[26]]}</span></div>
+                <div class="cell mod-row"><span class="label">AMT</span><span class="val">${(pcb[27] << 24 >> 24)}</span></div>
+            </div></div>`;
+        }
+
+        function createModesModule(pcb) {
+            const sync = (pcb[40] & 0x01) ? "ON" : "OFF";
+            const am = (pcb[40] & 0x02) ? "ON" : "OFF";
+            const mono = (pcb[40] & 0x04) ? "ON" : "OFF";
+            return `<div class="module span-3"><div class="module-header">MODES</div><div class="param-grid">
+                <div class="cell"><span class="label">SYNC</span><span class="val">${sync}</span></div>
+                <div class="cell"><span class="label">AM</span><span class="val">${am}</span></div>
+                <div class="cell"><span class="label">MONO</span><span class="val">${mono}</span></div>
+                <div class="cell" style="grid-column:span 2"><span class="label">GLIDE</span><span class="val">${pcb[41]}</span></div>
+            </div></div>`;
+        }
+
+        function createSplitModule(pcb) {
+            return `<div class="module span-3"><div class="module-header">SPLIT/LAYER</div><div class="param-grid">
+                <div class="cell" style="grid-column:span 2"><span class="label">PROG</span><span class="val">${pcb[92]}</span></div>
+                <div class="cell" style="grid-column:span 2"><span class="label">KEY</span><span class="val">${pcb[93]}</span></div>
             </div></div>`;
         }
     </script>
