@@ -29,7 +29,7 @@
                     font-style: normal;
                 }
                 ```
-      4, Use the Font:
+      4. Use the Font:
           1. Apply the font to your SPA's CSS:
                 ##### css
                  ```
