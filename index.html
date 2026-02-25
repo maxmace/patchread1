@@ -325,8 +325,8 @@
                     </div>`;
             }
 
-            // ROW 5: FILTER / MODES / SPLIT / DCA4
-            // Filter Block
+            // ROW 5: FILTER / MODES / DCA4 & PAN
+            // Block 1: Filter
             db.innerHTML += `
                 <div class="module span-4">
                     <div class="module-header">FILTER</div>
@@ -336,12 +336,12 @@
                         <div class="cell"><span class="label">KEYBOARD</span><span class="num">${pcb[90]}</span></div>
                     </div>
                     <div class="param-grid-row">
-                        ${renderMod('MOD 1', pcb[91]&0x0F, pcb[92], "")}
-                        ${renderMod('MOD 2', pcb[91]>>4, pcb[94], "")}
+                        ${renderMod('MODULATOR 1', pcb[91]&0x0F, pcb[92], "")}
+                        ${renderMod('MODULATOR 2', pcb[91]>>4, pcb[94], "")}
                     </div>
                 </div>`;
 
-            // Modes Block
+            // Block 2: Modes
             const modeByte = pcb[100];
             db.innerHTML += `
                 <div class="module span-4">
@@ -358,17 +358,31 @@
                     </div>
                 </div>`;
 
-            // DCA 4 / Pan Block
+            // Block 3: DCA 4 FINAL VOLUME AND PAN
             db.innerHTML += `
                 <div class="module span-4">
-                    <div class="module-header">DCA 4 & PAN</div>
+                    <div class="module-header">DCA 4 FINAL VOLUME AND PAN</div>
                     <div class="param-grid-row">
-                        <div class="cell"><span class="label">FINAL VOL</span><span class="num">${pcb[95]}</span></div>
+                        <div class="cell"><span class="label">VOLUME</span><span class="num">${pcb[95]}</span></div>
                         <div class="cell"><span class="label">PAN</span><span class="num">${pcb[98]}</span></div>
                     </div>
                     <div class="param-grid-row">
-                        ${renderMod('VOL MOD', pcb[96]&0x0F, pcb[97], "")}
-                        <div class="cell"><span class="label">PAN MOD</span><span class="mod-src">${MODS[pcb[99] & 0x0F]}</span></div>
+                        <div class="cell" data-tooltip="Hard-coded to ENV4">
+                            <span class="label">MODULATOR 1</span>
+                            <div class="mod-container">
+                                <span class="mod-src">ENV4</span>
+                                <span class="mod-star">*</span>
+                                <span class="mod-val">${toSigned(pcb[97])}</span>
+                            </div>
+                        </div>
+                        <div class="cell">
+                            <span class="label">MODULATOR 2</span>
+                            <div class="mod-container">
+                                <span class="mod-src">${MODS[pcb[99] & 0x0F]}</span>
+                                <span class="mod-star">*</span>
+                                <span class="mod-val">${toSigned(pcb[96])}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>`;
         }
