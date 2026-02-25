@@ -324,6 +324,53 @@
                         </div>
                     </div>`;
             }
+
+            // ROW 5: FILTER / MODES / SPLIT / DCA4
+            // Filter Block
+            db.innerHTML += `
+                <div class="module span-4">
+                    <div class="module-header">FILTER</div>
+                    <div class="param-grid-row">
+                        <div class="cell"><span class="label">FREQ</span><span class="num">${pcb[88]}</span></div>
+                        <div class="cell"><span class="label">RES (Q)</span><span class="num">${pcb[89]}</span></div>
+                        <div class="cell"><span class="label">KEYBOARD</span><span class="num">${pcb[90]}</span></div>
+                    </div>
+                    <div class="param-grid-row">
+                        ${renderMod('MOD 1', pcb[91]&0x0F, pcb[92], "")}
+                        ${renderMod('MOD 2', pcb[91]>>4, pcb[94], "")}
+                    </div>
+                </div>`;
+
+            // Modes Block
+            const modeByte = pcb[100];
+            db.innerHTML += `
+                <div class="module span-4">
+                    <div class="module-header">MODES</div>
+                    <div class="param-grid-row">
+                        <div class="cell"><span class="label">SYNC</span><span class="num">${(modeByte & 0x01) ? "ON" : "OFF"}</span></div>
+                        <div class="cell"><span class="label">AM</span><span class="num">${(modeByte & 0x02) ? "ON" : "OFF"}</span></div>
+                        <div class="cell"><span class="label">MONO</span><span class="num">${(modeByte & 0x04) ? "ON" : "OFF"}</span></div>
+                        <div class="cell"><span class="label">GLIDE</span><span class="num">${pcb[101]}</span></div>
+                    </div>
+                    <div class="param-grid-row">
+                        <div class="cell"><span class="label">VC02 FIX</span><span class="num">${(modeByte & 0x08) ? "ON" : "OFF"}</span></div>
+                        <div class="cell"><span class="label">ENV RE-TRIG</span><span class="num">${(modeByte & 0x10) ? "ON" : "OFF"}</span></div>
+                    </div>
+                </div>`;
+
+            // DCA 4 / Pan Block
+            db.innerHTML += `
+                <div class="module span-4">
+                    <div class="module-header">DCA 4 & PAN</div>
+                    <div class="param-grid-row">
+                        <div class="cell"><span class="label">FINAL VOL</span><span class="num">${pcb[95]}</span></div>
+                        <div class="cell"><span class="label">PAN</span><span class="num">${pcb[98]}</span></div>
+                    </div>
+                    <div class="param-grid-row">
+                        ${renderMod('VOL MOD', pcb[96]&0x0F, pcb[97], "")}
+                        <div class="cell"><span class="label">PAN MOD</span><span class="mod-src">${MODS[pcb[99] & 0x0F]}</span></div>
+                    </div>
+                </div>`;
         }
     </script>
 </body>
