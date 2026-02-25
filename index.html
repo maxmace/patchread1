@@ -5,41 +5,19 @@
     <title>Ensoniq SQ-80 Librarian</title>
     <style>
         :root {
-            --bg: #121212;
-            --panel: #1e1e1e;
-            --accent: #4a90e2; 
-            --text: #dcdcdc;
-            --border: #333;
-            --label: #777;
-            --esq-gold: #f1c40f;
-            --sq80-fixed: #3498db;
-            --sq80-prob: #1abc9c;
-            --sq80-poss: #16a085;
-            --hidden-wave: #00d2ff;
-            --glass: rgba(255, 255, 255, 0.03);
-            --tooltip-bg: #2c3e50;
+            --bg: #121212; --panel: #1e1e1e; --accent: #4a90e2; 
+            --text: #dcdcdc; --border: #333; --label: #777;
+            --esq-gold: #f1c40f; --sq80-fixed: #3498db;
+            --tooltip-bg: #2c3e50; --glass: rgba(255, 255, 255, 0.03);
         }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        
+        #drop-zone { width: 100%; height: 60px; border: 2px dashed #444; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #1e1e1e; cursor: pointer; color: var(--accent); margin-bottom: 15px; transition: border-color 0.3s; }
+        #drop-zone:hover { border-color: var(--accent); }
 
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background-color: var(--bg); color: var(--text);
-            margin: 0; padding: 20px;
-        }
-
-        #drop-zone {
-            width: 100%; height: 60px; border: 2px dashed #444; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            background: #1e1e1e; cursor: pointer; color: var(--accent); margin-bottom: 15px;
-        }
-
-        .file-info-bar {
-            display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
-            font-size: 13px; padding: 12px; background: var(--panel);
-            border: 1px solid var(--border); border-radius: 6px;
-        }
-
+        .file-info-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; font-size: 13px; padding: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
         .label-blue { color: var(--accent); font-weight: 600; text-transform: uppercase; font-size: 11px; }
-        .type-icon { padding: 3px 10px; border-radius: 4px; font-weight: bold; font-size: 10px; color: white; }
+        .type-icon { padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 10px; color: white; letter-spacing: 1px; }
         .icon-bank { background: #27ae60; }
         .icon-single { background: #8e44ad; }
 
@@ -47,83 +25,93 @@
         .bank-block { background: var(--panel); border: 1px solid var(--border); padding: 15px; border-radius: 8px; }
         .bank-header { font-weight: bold; color: var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 12px; font-size: 11px; letter-spacing: 1px; }
         .patch-list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-        .patch-item { font-size: 11px; padding: 8px 4px; background: #252525; text-align: center; cursor: pointer; border: 1px solid #333; border-radius: 4px; }
+        .patch-item { font-size: 11px; padding: 8px 4px; background: #252525; text-align: center; cursor: pointer; border: 1px solid #333; border-radius: 4px; transition: 0.2s; }
+        .patch-item:hover { background: #333; }
         .patch-item.selected { background: var(--accent); color: #fff; border-color: #fff; }
 
-        .status-area { 
-            margin-bottom: 30px; padding: 20px; border-radius: 8px; border-left: 4px solid var(--accent);
-            background: linear-gradient(to right, #1a1a1a, #121212);
-        }
-
-        .synth-type-badge {
-            display: inline-block; margin-left: 15px; padding: 4px 12px; border-radius: 4px;
-            font-size: 10px; font-weight: 800; text-transform: uppercase;
-        }
-        .badge-esq { background: rgba(241, 196, 15, 0.1); color: var(--esq-gold); border: 1px solid var(--esq-gold); }
-        .badge-sq80 { background: rgba(52, 152, 219, 0.1); color: var(--sq80-fixed); border: 1px solid var(--sq80-fixed); }
-        .badge-sq80-prob { background: rgba(26, 188, 156, 0.1); color: var(--sq80-prob); border: 1px solid var(--sq80-prob); }
-        .badge-sq80-poss { background: rgba(22, 160, 133, 0.1); color: var(--sq80-poss); border: 1px solid var(--sq80-poss); }
-        .badge-hidden { background: rgba(0, 210, 255, 0.1); color: var(--hidden-wave); border: 1px solid var(--hidden-wave); }
+        .status-area { margin-bottom: 30px; padding: 20px; border-radius: 8px; border-left: 4px solid var(--accent); background: linear-gradient(to right, #1a1a1a, #121212); display: flex; align-items: center; gap: 15px; }
+        .patch-type-badge { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 3px; color: #fff; text-transform: uppercase; }
+        .badge-esq { background: #e67e22; }
+        .badge-sq80 { background: #2980b9; }
+        .badge-hidden { background: #c0392b; }
 
         .dashboard { display: grid; grid-template-columns: repeat(12, 1fr); gap: 15px; }
-        .module { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; position: relative; }
+        
+        .module { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; position: relative; overflow: visible; }
         .span-4 { grid-column: span 4; }
         .span-3 { grid-column: span 3; }
-        .module-header { background: var(--glass); font-size: 10px; font-weight: 800; color: var(--accent); padding: 8px 12px; border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0; }
-
-        .param-grid-row { display: flex; border-bottom: 1px solid var(--border); }
+        
+        .module-header { background: var(--glass); font-size: 10px; font-weight: 800; color: var(--accent); padding: 8px 12px; border-bottom: 1px solid var(--border); border-top-left-radius: 8px; border-top-right-radius: 8px; }
+        .param-grid-row { display: flex; border-bottom: 1px solid var(--border); width: 100%; }
         .param-grid-row:last-child { border-bottom: none; }
-        .cell { flex: 1; padding: 8px 4px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; position: relative; cursor: help; }
+        
+        .cell { flex: 1; padding: 8px 4px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; position: relative; min-height: 48px; }
         .cell:last-child { border-right: none; }
         
-        .label { font-size: 9px; color: var(--label); text-transform: uppercase; margin-bottom: 2px; }
-        .num { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; }
-        
-        .mod-container { display: flex; align-items: center; justify-content: center; }
-        .mod-src { color: #aaa; font-size: 11px; font-weight: 600; }
-        .mod-star { color: var(--label); font-size: 20px; font-weight: bold; padding: 0 12px; display: inline-block; transform: translateY(20%); user-select: none; }
-        .mod-val { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: bold; }
+        .label { font-size: 8px; color: var(--label); text-transform: uppercase; margin-bottom: 2px; line-height: 1; pointer-events: none; }
+        .num { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; }
+        .mod-container { display: flex; align-items: center; justify-content: center; width: 100%; }
+        .mod-src { color: #aaa; font-size: 10px; font-weight: 600; }
+        .mod-star { color: var(--label); font-size: 14px; padding: 0 2px; }
+        .mod-val { color: #5dade2; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+        .wave-name { color: #fff; font-size: 10px; font-weight: bold; }
 
-        .wave-num { font-size: 9px; color: var(--accent); opacity: 0.8; font-weight: bold; }
-        .wave-name { color: #fff; font-size: 11px; font-weight: bold; }
-
-        /* Tooltip Logic */
-        .cell::after {
-            content: attr(data-tooltip);
-            position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-10px);
-            width: 220px; padding: 12px; border-radius: 6px;
-            background: var(--tooltip-bg); color: #fff; font-size: 11px; line-height: 1.4;
-            text-align: left; visibility: hidden; opacity: 0; z-index: 1000;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6); pointer-events: none;
-            white-space: pre-wrap; transition: opacity 0.2s; border: 1px solid rgba(255,255,255,0.1);
+        .cell[data-tooltip]::after { 
+            content: attr(data-tooltip); 
+            position: absolute; 
+            bottom: 110%; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 200px; 
+            padding: 10px; 
+            border-radius: 6px; 
+            background: var(--tooltip-bg); 
+            color: #fff; 
+            font-size: 11px; 
+            visibility: hidden; 
+            opacity: 0; 
+            z-index: 9999; 
+            transition: opacity 0.15s ease; 
+            border: 1px solid rgba(255,255,255,0.2); 
+            pointer-events: none; 
+            text-transform: none; 
+            text-align: left;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-        .cell:hover { z-index: 1001; }
-        .cell:hover::after { visibility: visible; opacity: 1; }
+        .cell[data-tooltip]:hover::after { visibility: visible; opacity: 1; }
+        
+        .module:nth-child(3n) .cell:last-child[data-tooltip]::after,
+        .module.span-3:nth-child(4n) .cell:last-child[data-tooltip]::after {
+            left: auto;
+            right: 0;
+            transform: none;
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
-
     <div id="drop-zone">Drop ESQ/SQ-80 SysEx Files Here</div>
     <input type="file" id="file-input" style="display: none;">
-
+    
     <div id="file-info-bar" class="file-info-bar hidden">
-        <span class="label-blue">FILE NAME: </span>
-        <span id="filename-display" style="color: #eee; margin-right: 10px;"></span>
+        <span class="label-blue">FILE NAME: </span><span id="filename-display" style="color: #eee; margin-right: 10px;"></span>
         <span id="file-type-icon" class="type-icon"></span>
     </div>
 
     <div id="bank-container" class="bank-container hidden">
-        <div class="bank-block"><div class="bank-header">INT 1</div><div id="bank-0" class="patch-list"></div></div>
-        <div class="bank-block"><div class="bank-header">INT 2</div><div id="bank-1" class="patch-list"></div></div>
-        <div class="bank-block"><div class="bank-header">INT 3</div><div id="bank-2" class="patch-list"></div></div>
-        <div class="bank-block"><div class="bank-header">INT 4</div><div id="bank-3" class="patch-list"></div></div>
+        <div class="bank-block"><div class="bank-header">INT 1 (1-10)</div><div id="bank-0" class="patch-list"></div></div>
+        <div class="bank-block"><div class="bank-header">INT 2 (11-20)</div><div id="bank-1" class="patch-list"></div></div>
+        <div class="bank-block"><div class="bank-header">INT 3 (21-30)</div><div id="bank-2" class="patch-list"></div></div>
+        <div class="bank-block"><div class="bank-header">INT 4 (31-40)</div><div id="bank-3" class="patch-list"></div></div>
     </div>
 
     <div id="status-area" class="status-area hidden">
-        <span class="label-blue" style="font-size: 13px;">PATCH NAME:</span>
-        <span id="patch-name-display" style="color: var(--esq-gold); font-size: 1.4rem; font-weight: 700; margin-left:10px;">---</span>
-        <span id="synth-type-icon"></span>
+        <div>
+            <span class="label-blue">PATCH NAME:</span>
+            <span id="patch-name-display" style="color: var(--esq-gold); font-size: 1.4rem; font-weight: 700; margin-left:10px;">---</span>
+        </div>
+        <div id="patch-type-container"></div>
     </div>
 
     <div id="dashboard" class="dashboard"></div>
@@ -131,23 +119,86 @@
     <script>
         const MODS = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL-X", "KBD", "KBD2", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
         const WAVES = ["SAW", "BELL", "SINE", "SQUARE", "PULSE", "NOISE 1", "NOISE 2", "NOISE 3", "BASS", "PIANO", "EL PNO", "VOICE 1", "VOICE 2", "KICK", "REED", "ORGAN", "SYNTH 1", "SYNTH 2", "SYNTH 3", "FORMT 1", "FORMT 2", "FORMT 3", "FORMT 4", "FORMT 5", "PULSE2", "SQR 2", "4 OCTS", "PRIME", "BASS 2", "E PNO2", "OCTAVE", "OCT+5", "SAW 2", "TRIANG", "REED 2", "REED 3", "GRIT 1", "GRIT 2", "GRIT 3", "GLINT 1", "GLINT 2", "GLINT 3", "CLAV", "BRASS", "STRING", "DIGIT 1", "DIGIT 2", "BELL 2", "ALIEN", "BREATH", "VOICE 3", "STEAM", "METAL", "CHIME", "BOWING", "PICK 1", "PICK 2", "MALLET", "SLAP", "PLINK", "PLUCK", "PLUNK", "CLICK", "CHIFF", "THUMP", "LOGDRM", "KICK 2", "SNARE", "TOMTOM", "HI HAT", "DRUMS 1", "DRUMS 2", "DRUMS 3", "DRUMS 4", "DRUMS 5"];
-        for(let i=75; i<=255; i++) { WAVES.push("WAV" + (i+1).toString().padStart(3, '0')); }
 
-        const LFO_HINTS = {
-            freq: "LFO FREQ. -- Determines the speed of the LFO. Range: 0 To 63.",
-            reset: "RESET -- Returns to start of cycle each key strike when ON.",
-            human: "HUMAN -- Adds random element to LFO Frequency when ON.",
-            wav: "WAV -- Selects Waveform: TRI, SAW, SQR, or NOISE.",
-            l1: "LEVEL 1 -- Level at which the LFO starts.",
-            delay: "DELAY -- Rate of change from L1 to L2.",
-            l2: "LEVEL 2 -- Level reached after Ramp sustain.",
-            mod: "MOD -- Modulation Source for LFO depth."
+        const HINTS = {
+            OSC: {
+                oct: "OCTAVE -- Sets basic pitch in octave steps from -3 to +3.",
+                semi: "SEMITONE -- Adjusts pitch in semitone steps (0-11).",
+                fine: "FINE -- Fine-tunes pitch in very small increments (0-31).",
+                wave: "WAVEFORM -- Selects the digital oscillator waveform or multisample.",
+                mod1: "MOD 1 -- First modulation source for oscillator pitch.",
+                mod2: "MOD 2 -- Second modulation source for oscillator pitch."
+            },
+            DCA: {
+                lvl: "LEVEL -- Sets the volume level for this DCA (0-63).",
+                out: "OUTPUT -- Determines if this DCA is sent to the Filter/Mixer.",
+                mod1: "MOD 1 -- Modulation source for DCA volume/amplitude.",
+                mod2: "MOD 2 -- Second modulation source for DCA volume."
+            },
+            LFO: {
+                freq: "LFO FREQ -- Determines speed of the LFO (0-63).",
+                reset: "RESET -- When ON, LFO restarts its cycle on every key strike.",
+                human: "HUMAN -- When ON, adds random fluctuations to LFO speed.",
+                wav: "WAV -- Selects LFO shape: Triangle, Sawtooth, Square, or Noise.",
+                l1: "LEVEL 1 -- The initial depth of the LFO.",
+                delay: "DELAY -- Determines how long it takes for LFO to ramp from L1 to L2.",
+                l2: "LEVEL 2 -- The final depth of the LFO.",
+                mod: "MOD -- Mod source to control the LFO's overall depth."
+            },
+            ENV: {
+                l1: "LEVEL 1 -- Peak level reached at the end of Time 1.",
+                l2: "LEVEL 2 -- Level reached at the end of Time 2.",
+                l3: "LEVEL 3 -- Sustain level held after Time 3 until key release.",
+                lv: "LEVEL VELOCITY -- Determines how much key velocity scales the overall envelope levels (L=Linear, X=Exponential).",
+                t1v: "T1 ATTACK VEL -- Determines how much key velocity shortens the Attack Time (T1).",
+                t1: "TIME 1 -- Attack time from zero to Level 1.",
+                t2: "TIME 2 -- Decay time from Level 1 to Level 2.",
+                t3: "TIME 3 -- Decay/Slope time from Level 2 to Level 3 (Sustain).",
+                t4: "TIME 4 -- Release time. Values with 'R' indicate a second release stage enabled.",
+                kbd: "KBD TRACK -- Determines how much higher notes shorten envelope times."
+            },
+            FILTER: {
+                freq: "FREQ -- Cutoff frequency of the 4-pole low-pass filter (0-127).",
+                res: "RES -- Resonance/Q. Higher values emphasize the cutoff point.",
+                kbd: "KBD -- How much filter cutoff follows the keyboard pitch.",
+                mod1: "MOD 1 -- Mod source for filter frequency (often ENV2).",
+                mod2: "MOD 2 -- Second mod source for filter frequency (often LFO or Pressure)."
+            },
+            MODE: {
+                sync: "SYNC -- Forces Osc 2 to restart whenever Osc 1 starts a new cycle.",
+                am: "AM -- Amplitude Modulation. Osc 1 is multiplied by Osc 2 for bell-like tones.",
+                mono: "MONO -- Limits the synth to playing one note at a time.",
+                rev: "RE-VOICE -- Restarts the entire voice cycle on every key strike.",
+                ree: "RE-ENV -- Restarts all envelopes from zero on every key strike.",
+                rew: "RE-WAV -- Restarts oscillator waveforms at 0 degrees on every key strike.",
+                full: "FULL CYCLE -- Forces envelopes to complete their full cycle regardless of when key is released."
+            },
+            SPLIT: {
+                status: "S/L STATUS -- Enables Split or Layer functionality.",
+                slprog: "S/L PROG -- The patch number used for the Split or Layer.",
+                layer: "LAYER -- Enables playing two patches simultaneously across the keyboard.",
+                lprog: "LAYER PROG -- Patch number used for the Layer sound.",
+                split: "SPLIT -- Splits the keyboard into two zones with different patches.",
+                sprog: "SPLIT PROG -- Patch number used for the Split sound.",
+                key: "SPLIT-KEY -- The MIDI key number where the split occurs."
+            },
+            DCA4: {
+                pan: "PAN -- Sets the voice's position in the stereo field.",
+                mod1: "MODULATOR 1 -- Hard-coded to Envelope 4 for master amplitude.",
+                mod2: "MODULATOR 2 -- Second mod source for master volume (often Pressure or Pedal)."
+            }
         };
 
         const toSigned = (val) => (val & 0x80) ? -(val ^ 0xFF) - 1 : Math.floor(val/2);
+        
+        const renderCell = (label, value, tooltip = "") => `
+            <div class="cell" ${tooltip ? `data-tooltip="${tooltip}"` : ""}>
+                <span class="label">${label}</span>
+                <span class="num">${value}</span>
+            </div>`;
 
-        const renderMod = (label, srcIdx, val, hint) => `
-            <div class="cell" data-tooltip="${hint}">
+        const renderMod = (label, srcIdx, val, tooltip = "") => `
+            <div class="cell" ${tooltip ? `data-tooltip="${tooltip}"` : ""}>
                 <span class="label">${label}</span>
                 <div class="mod-container">
                     <span class="mod-src">${MODS[srcIdx]}</span>
@@ -157,8 +208,8 @@
             </div>`;
 
         let patches = [];
-        const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
 
         dropZone.onclick = () => fileInput.click();
         fileInput.onchange = (e) => handleFile(e.target.files[0]);
@@ -182,17 +233,23 @@
             patches = [];
             const pcbSize = 102;
             const total = Math.floor(unpacked.length / pcbSize);
-
-            document.getElementById('bank-container').classList.toggle('hidden', total <= 1);
+            
             const typeIcon = document.getElementById('file-type-icon');
-            typeIcon.innerText = total > 1 ? "BANK" : "SINGLE PATCH";
-            typeIcon.className = total > 1 ? "type-icon icon-bank" : "type-icon icon-single";
+            if (total > 1) {
+                typeIcon.innerText = "BANK";
+                typeIcon.className = "type-icon icon-bank";
+                document.getElementById('bank-container').classList.remove('hidden');
+            } else {
+                typeIcon.innerText = "SINGLE";
+                typeIcon.className = "type-icon icon-single";
+                document.getElementById('bank-container').classList.add('hidden');
+            }
 
             for (let i = 0; i < total; i++) {
                 let pcb = unpacked.slice(i * pcbSize, (i + 1) * pcbSize);
                 let name = "";
                 for(let n=0; n<6; n++) { name += String.fromCharCode(pcb[n] & 0x7F); }
-                patches.push({ name: name.trim(), pcb: pcb });
+                patches.push({ name: name.trim() || "UNTITL", pcb: pcb });
             }
             renderBanks();
             if (patches.length > 0) displayParameters(patches[0]);
@@ -218,6 +275,28 @@
             }
         }
 
+        function resolveName(num) {
+            return (patches[num]) ? `${patches[num].name}` : num.toString().padStart(2, '0');
+        }
+
+        function updateTypeIcons(pcb) {
+            const container = document.getElementById('patch-type-container');
+            container.innerHTML = '';
+            
+            // Check oscillators for wave indices
+            let waves = [pcb[63], pcb[73], pcb[83]];
+            let isSQ80 = waves.some(w => w >= 32 && w <= 74);
+            let isHidden = waves.some(w => w > 74);
+
+            if (isHidden) {
+                container.innerHTML += `<span class="patch-type-badge badge-hidden">Hidden Waves</span>`;
+            } else if (isSQ80) {
+                container.innerHTML += `<span class="patch-type-badge badge-sq80">SQ-80</span>`;
+            } else {
+                container.innerHTML += `<span class="patch-type-badge badge-esq">ESQ-1</span>`;
+            }
+        }
+
         function displayParameters(patch) {
             document.getElementById('status-area').classList.remove('hidden');
             document.getElementById('patch-name-display').innerText = patch.name;
@@ -225,60 +304,47 @@
             const db = document.getElementById('dashboard');
             db.innerHTML = '';
 
-            // Patch Detection Logic
-            let hasHidden = (pcb[63] >= 74 || pcb[73] >= 74 || pcb[83] >= 74);
-            let lvl1 = false, lvl2 = false, lvl3 = false;
-            for(let e=0; e<4; e++) {
-                let base = 6 + (e * 10);
-                if (pcb[base+9] & 0x80) lvl1 = true;
-                if (pcb[base+2] & 0x80) lvl2 = true;
-            }
-            if (pcb[63] > 31 || pcb[73] > 31 || pcb[83] > 31) lvl3 = true;
-            const badge = document.getElementById('synth-type-icon');
-            if (hasHidden) { badge.innerText = "HIDDEN WAVE"; badge.className = "synth-type-badge badge-hidden"; }
-            else if (lvl1 && lvl2 && lvl3) { badge.innerText = "SQ-80"; badge.className = "synth-type-badge badge-sq80"; }
-            else if (lvl1 || lvl2) { badge.innerText = "PROBABLE SQ-80"; badge.className = "synth-type-badge badge-sq80-prob"; }
-            else { badge.innerText = "ESQ-1"; badge.className = "synth-type-badge badge-esq"; }
+            updateTypeIcons(pcb);
 
             // ROW 1: OSCILLATORS
             for(let i=1; i<=3; i++) {
                 let base = 58 + (i-1)*10;
                 let semi = pcb[base] & 0x7F;
-                let wIdx = pcb[base+5];
                 db.innerHTML += `
                     <div class="module span-4">
                         <div class="module-header">OSCILLATOR ${i}</div>
                         <div class="param-grid-row">
-                            <div class="cell"><span class="label">OCT</span><span class="num">${Math.floor(semi/12)-3}</span></div>
-                            <div class="cell"><span class="label">SEMI</span><span class="num">${semi%12}</span></div>
-                            <div class="cell"><span class="label">FINE</span><span class="num">${pcb[base+1]}</span></div>
-                            <div class="cell"><span class="label">WAVE</span><span class="wave-num">W ${wIdx+1}</span><span class="wave-name">${WAVES[wIdx] || "---"}</span></div>
+                            ${renderCell('OCT', Math.floor(semi/12)-3, HINTS.OSC.oct)}
+                            ${renderCell('SEMI', semi%12, HINTS.OSC.semi)}
+                            ${renderCell('FINE', pcb[base+1], HINTS.OSC.fine)}
+                            <div class="cell" data-tooltip="${HINTS.OSC.wave}"><span class="label">WAVE</span><span class="wave-name">${WAVES[pcb[base+5]] || "---"}</span></div>
                         </div>
                         <div class="param-grid-row">
-                            ${renderMod('MOD 1', pcb[base+2]&0x0F, pcb[base+3], "")}
-                            ${renderMod('MOD 2', pcb[base+2]>>4, pcb[base+4], "")}
+                            ${renderMod('MOD 1', pcb[base+2]&0x0F, pcb[base+3], HINTS.OSC.mod1)}
+                            ${renderMod('MOD 2', pcb[base+2]>>4, pcb[base+4], HINTS.OSC.mod2)}
                         </div>
                     </div>`;
             }
 
-            // ROW 2: DCAs
+            // ROW 2: DCA 1-3
             for(let i=1; i<=3; i++) {
                 let base = 64 + (i-1)*10;
                 db.innerHTML += `
                     <div class="module span-4">
-                        <div class="module-header">DCA AMPLIFIER ${i}</div>
+                        <div class="module-header">DCA ${i}</div>
                         <div class="param-grid-row">
-                            <div class="cell"><span class="label">LEVEL</span><span class="num">${pcb[base]}</span></div>
-                            <div class="cell"><span class="label">OUTPUT</span><span class="num">${(pcb[base+5]&0x01)?"ON":"OFF"}</span></div>
+                            ${renderCell('LEVEL', pcb[base], HINTS.DCA.lvl)}
+                            <div class="cell"></div>
+                            ${renderCell('OUTPUT', (pcb[base+5]&0x01)?"ON":"OFF", HINTS.DCA.out)}
                         </div>
                         <div class="param-grid-row">
-                            ${renderMod('MOD 1', pcb[base+1]&0x0F, pcb[base+2], "")}
-                            ${renderMod('MOD 2', pcb[base+1]>>4, pcb[base+3], "")}
+                            ${renderMod('MOD 1', pcb[base+1]&0x0F, pcb[base+2], HINTS.DCA.mod1)}
+                            ${renderMod('MOD 2', pcb[base+1]>>4, pcb[base+3], HINTS.DCA.mod2)}
                         </div>
                     </div>`;
             }
 
-            // ROW 3: LFOs
+            // ROW 3: LFO 1-3
             for(let i=1; i<=3; i++) {
                 let base = 36 + (i-1)*6; 
                 let wIdx = (pcb[base+1]>>2)&0x03;
@@ -286,113 +352,105 @@
                     <div class="module span-4">
                         <div class="module-header">LFO ${i}</div>
                         <div class="param-grid-row">
-                            <div class="cell" data-tooltip="${LFO_HINTS.freq}"><span class="label">FREQ</span><span class="num">${pcb[base]}</span></div>
-                            <div class="cell" data-tooltip="${LFO_HINTS.reset}"><span class="label">RESET</span><span class="num">${(pcb[base+1]&0x01)?"ON":"OFF"}</span></div>
-                            <div class="cell" data-tooltip="${LFO_HINTS.human}"><span class="label">HUMAN</span><span class="num">${(pcb[base+1]&0x02)?"ON":"OFF"}</span></div>
-                            <div class="cell" data-tooltip="${LFO_HINTS.wav}"><span class="label">WAV</span><span class="wave-name">${["TRI","SAW","SQR","NOISE"][wIdx]}</span></div>
+                            ${renderCell('FREQ', pcb[base], HINTS.LFO.freq)}
+                            ${renderCell('RESET', (pcb[base+1]&0x01)?"ON":"OFF", HINTS.LFO.reset)}
+                            ${renderCell('HUMAN', (pcb[base+1]&0x02)?"ON":"OFF", HINTS.LFO.human)}
+                            <div class="cell" data-tooltip="${HINTS.LFO.wav}"><span class="label">WAV</span><span class="wave-name">${["TRI","SAW","SQR","NOISE"][wIdx]}</span></div>
                         </div>
                         <div class="param-grid-row">
-                            <div class="cell" data-tooltip="${LFO_HINTS.l1}"><span class="label">LEVEL 1</span><span class="num">${pcb[base+5]}</span></div>
-                            <div class="cell" data-tooltip="${LFO_HINTS.delay}"><span class="label">DELAY</span><span class="num">${pcb[base+2]}</span></div>
-                            <div class="cell" data-tooltip="${LFO_HINTS.l2}"><span class="label">LEVEL 2</span><span class="num">${pcb[base+5]}</span></div>
-                            ${renderMod('MOD', pcb[base+3]&0x0F, pcb[base+4], LFO_HINTS.mod)}
+                            ${renderCell('LEVEL 1', pcb[base+5], HINTS.LFO.l1)}
+                            ${renderCell('DELAY', pcb[base+2], HINTS.LFO.delay)}
+                            ${renderCell('LEVEL 2', pcb[base+5], HINTS.LFO.l2)}
+                            ${renderMod('MOD', pcb[base+3]&0x0F, pcb[base+4], HINTS.LFO.mod)}
                         </div>
                     </div>`;
             }
 
-            // ROW 4: ENVELOPES
+            // ROW 4: ENVELOPES (2-line, 5-column)
             for(let i=1; i<=4; i++) {
                 let base = 6 + (i-1)*10;
+                let velDisp = (pcb[base+8] > 63) ? `${pcb[base+8]-64}X` : `${pcb[base+8]}L`;
+                let t4Disp = (pcb[base+7] > 63) ? `${pcb[base+7]-64}R` : `${pcb[base+7]}`;
                 db.innerHTML += `
                     <div class="module span-3">
-                        <div class="module-header">ENVELOPE ${i}</div>
+                        <div class="module-header">ENV ${i}</div>
                         <div class="param-grid-row">
-                            <div class="cell" data-tooltip="T1: Attack Time"><span class="label">T1</span><span class="num">${pcb[base+4]}</span></div>
-                            <div class="cell" data-tooltip="T2: Decay 1 Time"><span class="label">T2</span><span class="num">${pcb[base+5]}</span></div>
-                            <div class="cell" data-tooltip="T3: Decay 2 Time"><span class="label">T3</span><span class="num">${pcb[base+6]}</span></div>
-                            <div class="cell" data-tooltip="T4: Release Time"><span class="label">T4</span><span class="num">${pcb[base+7]}</span></div>
+                            ${renderCell('LEVEL 1', toSigned(pcb[base]), HINTS.ENV.l1)}
+                            ${renderCell('LEVEL 2', toSigned(pcb[base+1]), HINTS.ENV.l2)}
+                            ${renderCell('LEVEL 3', toSigned(pcb[base+2]), HINTS.ENV.l3)}
+                            ${renderCell('LVL VEL', velDisp, HINTS.ENV.lv)}
+                            ${renderCell('T1 ATK VEL', pcb[base+9], HINTS.ENV.t1v)}
                         </div>
                         <div class="param-grid-row">
-                            <div class="cell" data-tooltip="L1: Attack Level"><span class="label">L1</span><span class="num">${toSigned(pcb[base])}</span></div>
-                            <div class="cell" data-tooltip="L2: Decay 1 Level"><span class="label">L2</span><span class="num">${toSigned(pcb[base+1])}</span></div>
-                            <div class="cell" data-tooltip="L3: Decay 2 Level (Sustain)"><span class="label">L3</span><span class="num">${toSigned(pcb[base+2])}</span></div>
-                            <div class="cell" data-tooltip="L4: Final Level"><span class="label">L4</span><span class="num">0</span></div>
-                        </div>
-                        <div class="param-grid-row">
-                             <div class="cell" data-tooltip="Keyboard Scaling"><span class="label">KBD</span><span class="num">${pcb[base+3]}</span></div>
-                             <div class="cell" data-tooltip="Velocity Scaling"><span class="label">VEL</span><span class="num">${pcb[base+8]}</span></div>
+                            ${renderCell('TIME 1', pcb[base+3], HINTS.ENV.t1)}
+                            ${renderCell('TIME 2', pcb[base+4], HINTS.ENV.t2)}
+                            ${renderCell('TIME 3', pcb[base+5], HINTS.ENV.t3)}
+                            ${renderCell('TIME 4', t4Disp, HINTS.ENV.t4)}
+                            ${renderCell('KBD TRACK', pcb[base+6], HINTS.ENV.kbd)}
                         </div>
                     </div>`;
             }
 
-            // ROW 5: FILTER / MODES / DCA4 & PAN
-            // Filter Block
+            // ROW 5: MASTER PAGES
+            // Filter
             db.innerHTML += `
-                <div class="module span-4">
+                <div class="module span-3">
                     <div class="module-header">FILTER</div>
                     <div class="param-grid-row">
-                        <div class="cell"><span class="label">FREQ</span><span class="num">${pcb[88]}</span></div>
-                        <div class="cell"><span class="label">RES (Q)</span><span class="num">${pcb[89]}</span></div>
-                        <div class="cell"><span class="label">KEYBOARD</span><span class="num">${pcb[90]}</span></div>
+                        ${renderCell('FREQ', pcb[46], HINTS.FILTER.freq)}
+                        ${renderCell('RES (Q)', pcb[47], HINTS.FILTER.res)}
+                        ${renderCell('KBD', pcb[48], HINTS.FILTER.kbd)}
                     </div>
                     <div class="param-grid-row">
-                        ${renderMod('MODULATOR 1', pcb[91]&0x0F, pcb[92], "")}
-                        ${renderMod('MODULATOR 2', pcb[91]>>4, pcb[94], "")}
+                        ${renderMod('MOD 1', pcb[49]&0x0F, pcb[50], HINTS.FILTER.mod1)}
+                        ${renderMod('MOD 2', pcb[49]>>4, pcb[51], HINTS.FILTER.mod2)}
                     </div>
                 </div>`;
 
-            // Modes Block Refined logic
-            const m = pcb[100];
-            const sync = (m & 0x01) ? "ON" : "OFF";
-            const am = (m & 0x02) ? "ON" : "OFF";
-            const mono = (m & 0x04) ? "ON" : "OFF";
-            const resVoice = (m & 0x08) ? "ON" : "OFF";
-            const resEnv = (m & 0x10) ? "ON" : "OFF";
-            const resOsc = (m & 0x20) ? "ON" : "OFF";
-            const envCycle = (m & 0x40) ? "ON" : "OFF";
-
+            // Mode
             db.innerHTML += `
-                <div class="module span-4">
+                <div class="module span-3">
                     <div class="module-header">MODE</div>
                     <div class="param-grid-row">
-                        <div class="cell"><span class="label">SYNC</span><span class="num">${sync}</span></div>
-                        <div class="cell"><span class="label">AM</span><span class="num">${am}</span></div>
-                        <div class="cell"><span class="label">MONO</span><span class="num">${mono}</span></div>
-                        <div class="cell"><span class="label">GLIDE</span><span class="num">${pcb[101]}</span></div>
+                        ${renderCell('SYNC', (pcb[52]&0x01)?"ON":"OFF", HINTS.MODE.sync)}
+                        ${renderCell('AM', (pcb[52]&0x02)?"ON":"OFF", HINTS.MODE.am)}
+                        ${renderCell('MONO', (pcb[52]&0x04)?"ON":"OFF", HINTS.MODE.mono)}
                     </div>
                     <div class="param-grid-row">
-                        <div class="cell"><span class="label">RESTART VOICE</span><span class="num">${resVoice}</span></div>
-                        <div class="cell"><span class="label">RESTART ENV</span><span class="num">${resEnv}</span></div>
-                        <div class="cell"><span class="label">RESTART OSC</span><span class="num">${resOsc}</span></div>
-                        <div class="cell"><span class="label">ENV CYCLE</span><span class="num">${envCycle}</span></div>
+                        ${renderCell('RE-VOICE', (pcb[52]&0x10)?"ON":"OFF", HINTS.MODE.rev)}
+                        ${renderCell('RE-ENV', (pcb[52]&0x08)?"ON":"OFF", HINTS.MODE.ree)}
+                        ${renderCell('RE-WAV', (pcb[53]&0x01)?"ON":"OFF", HINTS.MODE.rew)}
+                        ${renderCell('FULL CYC', (pcb[53]&0x02)?"ON":"OFF", HINTS.MODE.full)}
                     </div>
                 </div>`;
 
-            // DCA 4 / Pan Block
+            // Split/Layer
             db.innerHTML += `
-                <div class="module span-4">
-                    <div class="module-header">DCA 4 FINAL VOLUME AND PAN</div>
+                <div class="module span-3">
+                    <div class="module-header">SPLIT/LAYER</div>
                     <div class="param-grid-row">
-                        <div class="cell"><span class="label">VOLUME</span><span class="num">${pcb[95]}</span></div>
-                        <div class="cell"><span class="label">PAN</span><span class="num">${pcb[98]}</span></div>
+                        ${renderCell('S/L STATUS', (pcb[95]&0x01)?"ON":"OFF", HINTS.SPLIT.status)}
+                        ${renderCell('S/L PROG', resolveName(pcb[94]), HINTS.SPLIT.slprog)}
+                        ${renderCell('LAYER', (pcb[95]&0x02)?"ON":"OFF", HINTS.SPLIT.layer)}
+                        ${renderCell('PROG', resolveName(pcb[96]))}
                     </div>
                     <div class="param-grid-row">
-                        <div class="cell">
-                            <span class="label">MODULATOR 1</span>
-                            <div class="mod-container">
-                                <span class="mod-src">ENV4</span>
-                                <span class="mod-star">*</span>
-                                <span class="mod-val">${toSigned(pcb[97])}</span>
-                            </div>
-                        </div>
-                        <div class="cell">
-                            <span class="label">MODULATOR 2</span>
-                            <div class="mod-container">
-                                <span class="mod-src">${MODS[pcb[99] & 0x0F]}</span>
-                                <span class="mod-star">*</span>
-                                <span class="mod-val">${toSigned(pcb[96])}</span>
-                            </div>
-                        </div>
+                        ${renderCell('SPLIT', (pcb[95]&0x04)?"ON":"OFF", HINTS.SPLIT.split)}
+                        ${renderCell('PROG', resolveName(pcb[97]), HINTS.SPLIT.sprog)}
+                        ${renderCell('SPLIT-KEY', pcb[98].toString().padStart(3,'0'), HINTS.SPLIT.key)}
+                    </div>
+                </div>`;
+
+            // DCA4
+            db.innerHTML += `
+                <div class="module span-3">
+                    <div class="module-header">DCA4 FINAL</div>
+                    <div class="param-grid-row">
+                        ${renderCell('PAN', toSigned(pcb[92]), HINTS.DCA4.pan)}
+                    </div>
+                    <div class="param-grid-row">
+                        <div class="cell" data-tooltip="${HINTS.DCA4.mod1}"><span class="label">MOD 1</span><div class="mod-container"><span class="mod-src">ENV4</span><span class="mod-star">*</span><span class="mod-val">${toSigned(pcb[89])}</span></div></div>
+                        ${renderMod('MOD 2', pcb[90]&0x0F, pcb[91], HINTS.DCA4.mod2)}
                     </div>
                 </div>`;
         }
