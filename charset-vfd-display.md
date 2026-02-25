@@ -1,3 +1,5 @@
+A horizontal toggle flip switch at the top to toggle between "responsive" look and "hardware" look
+
 ### The Ensoniq SQ-80 utilizes the NEC FIP80B5R Vacuum Fluorescent Display (VFD). 
 
 1. Table of VFD chars and their ascii equivalents
