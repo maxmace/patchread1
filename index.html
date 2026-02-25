@@ -69,7 +69,6 @@
         .module { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; position: relative; }
         .span-4 { grid-column: span 4; }
         .span-3 { grid-column: span 3; }
-        .span-2 { grid-column: span 2; }
         .module-header { background: var(--glass); font-size: 10px; font-weight: 800; color: var(--accent); padding: 8px 12px; border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0; }
 
         .param-grid-row { display: flex; border-bottom: 1px solid var(--border); }
@@ -88,14 +87,24 @@
         .wave-num { font-size: 9px; color: var(--accent); opacity: 0.8; font-weight: bold; }
         .wave-name { color: #fff; font-size: 11px; font-weight: bold; }
 
+        /* Tooltip Logic */
+        .cell::after {
+            content: attr(data-tooltip);
+            position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-10px);
+            width: 220px; padding: 12px; border-radius: 6px;
+            background: var(--tooltip-bg); color: #fff; font-size: 11px; line-height: 1.4;
+            text-align: left; visibility: hidden; opacity: 0; z-index: 1000;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6); pointer-events: none;
+            white-space: pre-wrap; transition: opacity 0.2s; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .cell:hover { z-index: 1001; }
+        .cell:hover::after { visibility: visible; opacity: 1; }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="drop-zone">
-        Drop ESQ/SQ-80 SysEx Files Here. Click to select files manually.
-    </div>
+    <div id="drop-zone">Drop ESQ/SQ-80 SysEx Files Here</div>
     <input type="file" id="file-input" style="display: none;">
 
     <div id="file-info-bar" class="file-info-bar hidden">
@@ -119,70 +128,203 @@
 
     <div id="dashboard" class="dashboard"></div>
 
-<script>
-/* === YOUR ENTIRE ORIGINAL SCRIPT REMAINS HERE UNCHANGED === */
-/* (All logic preserved exactly as you provided earlier) */
-/* Only addition below: ROW 5 inside displayParameters() */
+    <script>
+        const MODS = ["LFO1", "LFO2", "LFO3", "ENV1", "ENV2", "ENV3", "ENV4", "VEL", "VEL-X", "KBD", "KBD2", "WHEEL", "PEDAL", "XCTRL", "PRESS", "OFF"];
+        const WAVES = ["SAW", "BELL", "SINE", "SQUARE", "PULSE", "NOISE 1", "NOISE 2", "NOISE 3", "BASS", "PIANO", "EL PNO", "VOICE 1", "VOICE 2", "KICK", "REED", "ORGAN", "SYNTH 1", "SYNTH 2", "SYNTH 3", "FORMT 1", "FORMT 2", "FORMT 3", "FORMT 4", "FORMT 5", "PULSE2", "SQR 2", "4 OCTS", "PRIME", "BASS 2", "E PNO2", "OCTAVE", "OCT+5", "SAW 2", "TRIANG", "REED 2", "REED 3", "GRIT 1", "GRIT 2", "GRIT 3", "GLINT 1", "GLINT 2", "GLINT 3", "CLAV", "BRASS", "STRING", "DIGIT 1", "DIGIT 2", "BELL 2", "ALIEN", "BREATH", "VOICE 3", "STEAM", "METAL", "CHIME", "BOWING", "PICK 1", "PICK 2", "MALLET", "SLAP", "PLINK", "PLUCK", "PLUNK", "CLICK", "CHIFF", "THUMP", "LOGDRM", "KICK 2", "SNARE", "TOMTOM", "HI HAT", "DRUMS 1", "DRUMS 2", "DRUMS 3", "DRUMS 4", "DRUMS 5"];
+        for(let i=75; i<=255; i++) { WAVES.push("WAV" + (i+1).toString().padStart(3, '0')); }
 
-/* ADD THIS AT THE END OF displayParameters(), BEFORE THE CLOSING } */
+        const LFO_HINTS = {
+            freq: "LFO FREQ. -- Determines the speed of the LFO. Range: 0 To 63.",
+            reset: "RESET -- Returns to start of cycle each key strike when ON.",
+            human: "HUMAN -- Adds random element to LFO Frequency when ON.",
+            wav: "WAV -- Selects Waveform: TRI, SAW, SQR, or NOISE.",
+            l1: "LEVEL 1 -- Level at which the LFO starts.",
+            delay: "DELAY -- Rate of change from L1 to L2.",
+            l2: "LEVEL 2 -- Level reached after Ramp sustain.",
+            mod: "MOD -- Modulation Source for LFO depth."
+        };
 
-//
-// ROW 5: FILTER + MODES + SPLIT/LAYER + DCA 4
-//
-let filterBase = 46;   // placeholder offsets
-let dca4Base   = 94;
+        const toSigned = (val) => (val & 0x80) ? -(val ^ 0xFF) - 1 : Math.floor(val/2);
 
-db.innerHTML += `
-<div class="module span-4">
-<div class="module-header">FILTER</div>
-<div class="param-grid-row">
-<div class="cell"><span class="label">FREQ</span><span class="num">${pcb[filterBase] ?? "--"}</span></div>
-<div class="cell"><span class="label">RES (Q)</span><span class="num">${pcb[filterBase+1] ?? "--"}</span></div>
-<div class="cell"><span class="label">KEYBOARD</span><span class="num">${pcb[filterBase+2] ?? "--"}</span></div>
-</div>
-<div class="param-grid-row">
-<div class="cell">
-<span class="label">MOD 1</span>
-<div class="mod-container">
-<span class="mod-src">${MODS[pcb[filterBase+3] & 0x0F] ?? "--"}</span>
-<span class="mod-star">*</span>
-<span class="mod-val">${pcb[filterBase+4] ?? "--"}</span>
-</div>
-</div>
-<div class="cell">
-<span class="label">MOD 2</span>
-<div class="mod-container">
-<span class="mod-src">${MODS[(pcb[filterBase+3] >> 4) & 0x0F] ?? "--"}</span>
-<span class="mod-star">*</span>
-<span class="mod-val">${pcb[filterBase+5] ?? "--"}</span>
-</div>
-</div>
-</div>
-</div>
+        const renderMod = (label, srcIdx, val, hint) => `
+            <div class="cell" data-tooltip="${hint}">
+                <span class="label">${label}</span>
+                <div class="mod-container">
+                    <span class="mod-src">${MODS[srcIdx]}</span>
+                    <span class="mod-star">*</span>
+                    <span class="mod-val">${toSigned(val)}</span>
+                </div>
+            </div>`;
 
-<div class="module span-3">
-<div class="module-header">MODES</div>
-<div class="param-grid-row">
-<div class="cell"><span class="label">COMING</span><span class="num">SOON</span></div>
-</div>
-</div>
+        let patches = [];
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
 
-<div class="module span-3">
-<div class="module-header">SPLIT / LAYER</div>
-<div class="param-grid-row">
-<div class="cell"><span class="label">COMING</span><span class="num">SOON</span></div>
-</div>
-</div>
+        dropZone.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('drop', e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
 
-<div class="module span-2">
-<div class="module-header">DCA 4</div>
-<div class="param-grid-row">
-<div class="cell"><span class="label">LEVEL</span><span class="num">${pcb[dca4Base] ?? "--"}</span></div>
-<div class="cell"><span class="label">PAN</span><span class="num">${pcb[dca4Base+1] ?? "--"}</span></div>
-</div>
-</div>
-`;
-</script>
+        function handleFile(file) {
+            if (!file) return;
+            document.getElementById('filename-display').innerText = file.name.toUpperCase();
+            document.getElementById('file-info-bar').classList.remove('hidden');
+            const reader = new FileReader();
+            reader.onload = (ev) => process(new Uint8Array(ev.target.result));
+            reader.readAsArrayBuffer(file);
+        }
 
+        function process(data) {
+            let unpacked = [];
+            for (let i = 5; i < data.length - 1; i += 2) {
+                unpacked.push(((data[i+1] & 0x0F) << 4) | (data[i] & 0x0F));
+            }
+            patches = [];
+            const pcbSize = 102;
+            const total = Math.floor(unpacked.length / pcbSize);
+
+            document.getElementById('bank-container').classList.toggle('hidden', total <= 1);
+            const typeIcon = document.getElementById('file-type-icon');
+            typeIcon.innerText = total > 1 ? "BANK" : "SINGLE PATCH";
+            typeIcon.className = total > 1 ? "type-icon icon-bank" : "type-icon icon-single";
+
+            for (let i = 0; i < total; i++) {
+                let pcb = unpacked.slice(i * pcbSize, (i + 1) * pcbSize);
+                let name = "";
+                for(let n=0; n<6; n++) { name += String.fromCharCode(pcb[n] & 0x7F); }
+                patches.push({ name: name.trim(), pcb: pcb });
+            }
+            renderBanks();
+            if (patches.length > 0) displayParameters(patches[0]);
+        }
+
+        function renderBanks() {
+            for (let b = 0; b < 4; b++) {
+                const list = document.getElementById(`bank-${b}`);
+                list.innerHTML = '';
+                for (let p = 0; p < 10; p++) {
+                    const idx = (b * 10) + p;
+                    if (!patches[idx]) break;
+                    const div = document.createElement('div');
+                    div.className = 'patch-item';
+                    div.innerText = patches[idx].name;
+                    div.onclick = () => {
+                        document.querySelectorAll('.patch-item').forEach(el => el.classList.remove('selected'));
+                        div.classList.add('selected');
+                        displayParameters(patches[idx]);
+                    };
+                    list.appendChild(div);
+                }
+            }
+        }
+
+        function displayParameters(patch) {
+            document.getElementById('status-area').classList.remove('hidden');
+            document.getElementById('patch-name-display').innerText = patch.name;
+            const pcb = patch.pcb;
+            const db = document.getElementById('dashboard');
+            db.innerHTML = '';
+
+            // Patch Detection Logic
+            let hasHidden = (pcb[63] >= 74 || pcb[73] >= 74 || pcb[83] >= 74);
+            let lvl1 = false, lvl2 = false, lvl3 = false;
+            for(let e=0; e<4; e++) {
+                let base = 6 + (e * 10);
+                if (pcb[base+9] & 0x80) lvl1 = true;
+                if (pcb[base+2] & 0x80) lvl2 = true;
+            }
+            if (pcb[63] > 31 || pcb[73] > 31 || pcb[83] > 31) lvl3 = true;
+            const badge = document.getElementById('synth-type-icon');
+            if (hasHidden) { badge.innerText = "HIDDEN WAVE"; badge.className = "synth-type-badge badge-hidden"; }
+            else if (lvl1 && lvl2 && lvl3) { badge.innerText = "SQ-80"; badge.className = "synth-type-badge badge-sq80"; }
+            else if (lvl1 || lvl2) { badge.innerText = "PROBABLE SQ-80"; badge.className = "synth-type-badge badge-sq80-prob"; }
+            else { badge.innerText = "ESQ-1"; badge.className = "synth-type-badge badge-esq"; }
+
+            // ROW 1: OSCILLATORS
+            for(let i=1; i<=3; i++) {
+                let base = 58 + (i-1)*10;
+                let semi = pcb[base] & 0x7F;
+                let wIdx = pcb[base+5];
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">OSCILLATOR ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">OCT</span><span class="num">${Math.floor(semi/12)-3}</span></div>
+                            <div class="cell"><span class="label">SEMI</span><span class="num">${semi%12}</span></div>
+                            <div class="cell"><span class="label">FINE</span><span class="num">${pcb[base+1]}</span></div>
+                            <div class="cell"><span class="label">WAVE</span><span class="wave-num">W ${wIdx+1}</span><span class="wave-name">${WAVES[wIdx] || "---"}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            ${renderMod('MOD 1', pcb[base+2]&0x0F, pcb[base+3], "")}
+                            ${renderMod('MOD 2', pcb[base+2]>>4, pcb[base+4], "")}
+                        </div>
+                    </div>`;
+            }
+
+            // ROW 2: DCAs
+            for(let i=1; i<=3; i++) {
+                let base = 64 + (i-1)*10;
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">DCA AMPLIFIER ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell"><span class="label">LEVEL</span><span class="num">${pcb[base]}</span></div>
+                            <div class="cell"><span class="label">OUTPUT</span><span class="num">${(pcb[base+5]&0x01)?"ON":"OFF"}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            ${renderMod('MOD 1', pcb[base+1]&0x0F, pcb[base+2], "")}
+                            ${renderMod('MOD 2', pcb[base+1]>>4, pcb[base+3], "")}
+                        </div>
+                    </div>`;
+            }
+
+            // ROW 3: LFOs
+            for(let i=1; i<=3; i++) {
+                let base = 36 + (i-1)*6; 
+                let wIdx = (pcb[base+1]>>2)&0x03;
+                db.innerHTML += `
+                    <div class="module span-4">
+                        <div class="module-header">LFO ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell" data-tooltip="${LFO_HINTS.freq}"><span class="label">FREQ</span><span class="num">${pcb[base]}</span></div>
+                            <div class="cell" data-tooltip="${LFO_HINTS.reset}"><span class="label">RESET</span><span class="num">${(pcb[base+1]&0x01)?"ON":"OFF"}</span></div>
+                            <div class="cell" data-tooltip="${LFO_HINTS.human}"><span class="label">HUMAN</span><span class="num">${(pcb[base+1]&0x02)?"ON":"OFF"}</span></div>
+                            <div class="cell" data-tooltip="${LFO_HINTS.wav}"><span class="label">WAV</span><span class="wave-name">${["TRI","SAW","SQR","NOISE"][wIdx]}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            <div class="cell" data-tooltip="${LFO_HINTS.l1}"><span class="label">LEVEL 1</span><span class="num">${pcb[base+5]}</span></div>
+                            <div class="cell" data-tooltip="${LFO_HINTS.delay}"><span class="label">DELAY</span><span class="num">${pcb[base+2]}</span></div>
+                            <div class="cell" data-tooltip="${LFO_HINTS.l2}"><span class="label">LEVEL 2</span><span class="num">${pcb[base+5]}</span></div>
+                            ${renderMod('MOD', pcb[base+3]&0x0F, pcb[base+4], LFO_HINTS.mod)}
+                        </div>
+                    </div>`;
+            }
+
+            // ROW 4: ENVELOPES
+            for(let i=1; i<=4; i++) {
+                let base = 6 + (i-1)*10;
+                db.innerHTML += `
+                    <div class="module span-3">
+                        <div class="module-header">ENVELOPE ${i}</div>
+                        <div class="param-grid-row">
+                            <div class="cell" data-tooltip="T1: Attack Time"><span class="label">T1</span><span class="num">${pcb[base+4]}</span></div>
+                            <div class="cell" data-tooltip="T2: Decay 1 Time"><span class="label">T2</span><span class="num">${pcb[base+5]}</span></div>
+                            <div class="cell" data-tooltip="T3: Decay 2 Time"><span class="label">T3</span><span class="num">${pcb[base+6]}</span></div>
+                            <div class="cell" data-tooltip="T4: Release Time"><span class="label">T4</span><span class="num">${pcb[base+7]}</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                            <div class="cell" data-tooltip="L1: Attack Level"><span class="label">L1</span><span class="num">${toSigned(pcb[base])}</span></div>
+                            <div class="cell" data-tooltip="L2: Decay 1 Level"><span class="label">L2</span><span class="num">${toSigned(pcb[base+1])}</span></div>
+                            <div class="cell" data-tooltip="L3: Decay 2 Level (Sustain)"><span class="label">L3</span><span class="num">${toSigned(pcb[base+2])}</span></div>
+                            <div class="cell" data-tooltip="L4: Final Level"><span class="label">L4</span><span class="num">0</span></div>
+                        </div>
+                        <div class="param-grid-row">
+                             <div class="cell" data-tooltip="Keyboard Scaling"><span class="label">KBD</span><span class="num">${pcb[base+3]}</span></div>
+                             <div class="cell" data-tooltip="Velocity Scaling"><span class="label">VEL</span><span class="num">${pcb[base+8]}</span></div>
+                        </div>
+                    </div>`;
+            }
+        }
+    </script>
 </body>
 </html>
