@@ -326,7 +326,7 @@
             }
 
             // ROW 5: FILTER / MODES / DCA4 & PAN
-            // Block 1: Filter
+            // Filter Block
             db.innerHTML += `
                 <div class="module span-4">
                     <div class="module-header">FILTER</div>
@@ -341,24 +341,34 @@
                     </div>
                 </div>`;
 
-            // Block 2: Modes
-            const modeByte = pcb[100];
+            // Modes Block Refined logic
+            const m = pcb[100];
+            const sync = (m & 0x01) ? "ON" : "OFF";
+            const am = (m & 0x02) ? "ON" : "OFF";
+            const mono = (m & 0x04) ? "ON" : "OFF";
+            const resVoice = (m & 0x08) ? "ON" : "OFF";
+            const resEnv = (m & 0x10) ? "ON" : "OFF";
+            const resOsc = (m & 0x20) ? "ON" : "OFF";
+            const envCycle = (m & 0x40) ? "ON" : "OFF";
+
             db.innerHTML += `
                 <div class="module span-4">
-                    <div class="module-header">MODES</div>
+                    <div class="module-header">MODE</div>
                     <div class="param-grid-row">
-                        <div class="cell"><span class="label">SYNC</span><span class="num">${(modeByte & 0x01) ? "ON" : "OFF"}</span></div>
-                        <div class="cell"><span class="label">AM</span><span class="num">${(modeByte & 0x02) ? "ON" : "OFF"}</span></div>
-                        <div class="cell"><span class="label">MONO</span><span class="num">${(modeByte & 0x04) ? "ON" : "OFF"}</span></div>
+                        <div class="cell"><span class="label">SYNC</span><span class="num">${sync}</span></div>
+                        <div class="cell"><span class="label">AM</span><span class="num">${am}</span></div>
+                        <div class="cell"><span class="label">MONO</span><span class="num">${mono}</span></div>
                         <div class="cell"><span class="label">GLIDE</span><span class="num">${pcb[101]}</span></div>
                     </div>
                     <div class="param-grid-row">
-                        <div class="cell"><span class="label">VC02 FIX</span><span class="num">${(modeByte & 0x08) ? "ON" : "OFF"}</span></div>
-                        <div class="cell"><span class="label">ENV RE-TRIG</span><span class="num">${(modeByte & 0x10) ? "ON" : "OFF"}</span></div>
+                        <div class="cell"><span class="label">RESTART VOICE</span><span class="num">${resVoice}</span></div>
+                        <div class="cell"><span class="label">RESTART ENV</span><span class="num">${resEnv}</span></div>
+                        <div class="cell"><span class="label">RESTART OSC</span><span class="num">${resOsc}</span></div>
+                        <div class="cell"><span class="label">ENV CYCLE</span><span class="num">${envCycle}</span></div>
                     </div>
                 </div>`;
 
-            // Block 3: DCA 4 FINAL VOLUME AND PAN
+            // DCA 4 / Pan Block
             db.innerHTML += `
                 <div class="module span-4">
                     <div class="module-header">DCA 4 FINAL VOLUME AND PAN</div>
@@ -367,7 +377,7 @@
                         <div class="cell"><span class="label">PAN</span><span class="num">${pcb[98]}</span></div>
                     </div>
                     <div class="param-grid-row">
-                        <div class="cell" data-tooltip="Hard-coded to ENV4">
+                        <div class="cell">
                             <span class="label">MODULATOR 1</span>
                             <div class="mod-container">
                                 <span class="mod-src">ENV4</span>
