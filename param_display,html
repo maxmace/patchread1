@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQ-80 Glass Editor Prototype</title>
+<style>
+  :root {
+    /* Developer Dark Theme */
+    --bg-dark: #05070a;        /* Darker, almost black */
+    --panel-glass: rgba(33, 50, 87, 0.322); /* Translucent Navy */
+    --sq80-green: #00d9ff;     /* Mirage Blue */
+    --label-color: #81abc5;    
+    --glass-border: rgba(0, 217, 255, 0.15); /* Subtle cyan border */
+    --glass-highlight: rgba(255, 255, 255, 0.339); /* Inner sheen */
+    
+    /* Layout Variables (STUDIO Spacing Defaults) */
+    --master-max-width: 1000px;
+    --grid-gap: 10px;
+    --row-height: 30px;
+    --param-flex: column;
+    --label-font: 10px;
+    --val-font: 12px;
+    --header-font: 12px;
+  }
+
+  body {
+    background-color: var(--bg-dark);
+    background-image: radial-gradient(circle at 50% 50%, #0d1117 0%, #05070a 100%);
+    color: var(--sq80-green);
+    font-family: 'Segoe UI', 'Roboto Mono', monospace;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+
+  .page-display {
+    background: var(--panel-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: auto var(--row-height) var(--row-height);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  }
+
+  /* Specific 4-column override for 3x3 grid blocks */
+  .w-3x3 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .w-3x3 .header {
+    grid-column: span 4;
+  }
+
+  .header {
+    grid-column: span 5;
+    color: #fff;
+    font-weight: 600;
+    font-size: var(--header-font);
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .param {
+    display: flex;
+    flex-direction: var(--param-flex);
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.2);
+    margin: 2px;
+    padding: 0 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.3);
+  }
+
+  .spacer { background: transparent !important; border: none !important; }
+
+  .label { color: var(--label-color); font-size: var(--label-font); text-transform: uppercase; }
+  .val { 
+    font-size: var(--val-font); 
+    text-shadow: 0 0 10px rgba(0, 217, 255, 0.5); 
+    /* Ensure composite values stay horizontal */
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 4px;
+    }
+
+  .master-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: var(--grid-gap);
+    max-width: var(--master-max-width);
+    margin: 0 auto;
+  }
+
+  .w-3x3 { grid-column: span 4; }
+  .w-4x2 { grid-column: span 3; }
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: span 3; }
+  .span-4 { grid-column: span 4; }
+  .span-5 { grid-column: span 5; }
+
+  @media (max-width: 900px) { .w-3x3, .w-4x2 { grid-column: span 12; } }
+</style>
+</head>
+<body>
+
+<div class="master-grid">
+  <section class="page-display w-3x3">
+    <div class="header">OSC 1</div>
+    <div class="param"><span class="label">OCT</span><span class="val" data-param="osc1_oct">-</span></div>
+    <div class="param"><span class="label">SEMI</span><span class="val" data-param="osc1_semi">--</span></div>
+    <div class="param"><span class="label">FINE</span><span class="val" data-param="osc1_fine">--</span></div>
+    <div class="param"><span class="label">WAVE</span><span class="val" data-param="osc1_wav">----</span></div>
+    <div class="param span-2">
+        <span class="label">MOD1</span><span class="val">
+            <span data-param="osc1_mod1_src">----</span> * <span data-param="osc1_mod1_amt">--</span>        
+        </span>
+    </div>
+    <div class="param span-2">
+        <span class="label">MOD2</span><span class="val">
+            <span data-param="osc1_mod2_src">----</span> * <span data-param="osc1_mod2_amt">--</span>        
+        </span>
+    </div>
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">OSC 2</div>
+    <div class="param"><span class="label">OCT</span><span class="val" data-param="osc2_oct">-</span></div>
+    <div class="param"><span class="label">SEMI</span><span class="val" data-param="osc2_semi">--</span></div>
+    <div class="param"><span class="label">FINE</span><span class="val" data-param="osc2_fine">--</span></div>
+    <div class="param"><span class="label">WAVE</span><span class="val" data-param="osc2_wav">----</span></div>
+    <div class="param span-2">
+        <span class="label">MOD1</span><span class="val">
+            <span data-param="osc2_mod1_src">----</span> * <span data-param="osc2_mod1_amt">--</span>        
+        </span>
+    </div>
+    <div class="param span-2">
+        <span class="label">MOD2</span><span class="val">
+            <span data-param="osc2_mod2_src">----</span> * <span data-param="osc2_mod2_amt">--</span>        
+        </span>
+    </div>
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">OSC 3</div>
+    <div class="param"><span class="label">OCT</span><span class="val" data-param="osc3_oct">-</span></div>
+    <div class="param"><span class="label">SEMI</span><span class="val" data-param="osc3_semi">--</span></div>
+    <div class="param"><span class="label">FINE</span><span class="val" data-param="osc3_fine">--</span></div>
+    <div class="param"><span class="label">WAVE</span><span class="val" data-param="osc3_wav">----</span></div>
+    <div class="param span-2">
+        <span class="label">MOD1</span><span class="val">
+            <span data-param="osc3_mod1_src">----</span> * <span data-param="osc3_mod1_amt">--</span>        
+        </span>
+    </div>
+    <div class="param span-2">
+        <span class="label">MOD2</span><span class="val">
+            <span data-param="osc3_mod2_src">----</span> * <span data-param="osc3_mod2_amt">--</span>        
+        </span>
+    </div>
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">DCA 1</div>
+    <div class="param"><span class="label">LEVEL</span><span class="val" data-param="dca1_level">--</span></div>
+    <div class="param span-2 spacer"></div>
+    <div class="param"><span class="label">OUTPUT</span><span class="val" data-param="dca1_output">---</span></div>
+    <div class="param span-2">
+        <span class="label">MOD1</span>
+            <span class="val">
+                <span data-param="dca1_mod1_src">----</span> * <span data-param="dca1_mod1_amt">--</span>
+            </span>    
+    </div>
+    <div class="param span-2">
+        <span class="label">MOD2</span>
+            <span class="val">
+                <span data-param="dca1_mod2_src">----</span> * <span data-param="dca1_mod2_amt">--</span>
+            </span>    
+    </div>  
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">DCA 2</div>
+    <div class="param"><span class="label">LEVEL</span><span class="val" data-param="dca2_level">--</span></div>
+    <div class="param span-2 spacer"></div>
+    <div class="param"><span class="label">OUTPUT</span><span class="val" data-param="dca2_output">---</span></div>
+    <div class="param span-2">
+        <span class="label">MOD1</span>
+            <span class="val">
+                <span data-param="dca2_mod1_src">----</span> * <span data-param="dca2_mod1_amt">--</span>
+            </span>    
+    </div>
+    <div class="param span-2">
+        <span class="label">MOD2</span>
+            <span class="val">
+                <span data-param="dca2_mod2_src">----</span> * <span data-param="dca2_mod2_amt">--</span>
+            </span>    
+    </div>  
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">DCA 3</div>
+    <div class="param"><span class="label">LEVEL</span><span class="val" data-param="dca3_level">--</span></div>
+    <div class="param span-2 spacer"></div>
+    <div class="param"><span class="label">OUTPUT</span><span class="val" data-param="dca3_output">---</span></div>
+    <div class="param span-2">
+        <span class="label">MOD1</span>
+            <span class="val">
+                <span data-param="dca3_mod1_src">----</span> * <span data-param="dca3_mod1_amt">--</span>
+            </span>    
+    </div>
+    <div class="param span-2">
+        <span class="label">MOD2</span>
+            <span class="val">
+                <span data-param="dca3_mod2_src">----</span> * <span data-param="dca3_mod2_amt">--</span>
+            </span>    
+    </div>  
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">LFO 1</div>
+    <div class="param"><span class="label">FREQ</span><span class="val" data-param="lfo1_freq">--</span></div>
+    <div class="param"><span class="label">RESET</span><span class="val" data-param="lfo1_reset">---</span></div>
+    <div class="param"><span class="label">HUMAN</span><span class="val" data-param="lfo1_human">---</span></div>
+    <div class="param"><span class="label">WAV</span><span class="val" data-param="lfo1_wav">----</span></div>
+    <div class="param"><span class="label">L1</span><span class="val" data-param="lfo1_l1">--</span></div>
+    <div class="param"><span class="label">DELAY</span><span class="val" data-param="lfo1_delay">--</span></div>
+    <div class="param"><span class="label">L2</span><span class="val" data-param="lfo1_l2">--</span></div>
+    <div class="param"><span class="label">MOD</span><span class="val" data-param="lfo1_mod">----</span></div>
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">LFO 2</div>
+    <div class="param"><span class="label">FREQ</span><span class="val" data-param="lfo2_freq">--</span></div>
+    <div class="param"><span class="label">RESET</span><span class="val" data-param="lfo2_reset">---</span></div>
+    <div class="param"><span class="label">HUMAN</span><span class="val" data-param="lfo2_human">---</span></div>
+    <div class="param"><span class="label">WAV</span><span class="val" data-param="lfo2_wav">----</span></div>
+    <div class="param"><span class="label">L1</span><span class="val" data-param="lfo2_l1">--</span></div>
+    <div class="param"><span class="label">DELAY</span><span class="val" data-param="lfo2_delay">--</span></div>
+    <div class="param"><span class="label">L2</span><span class="val" data-param="lfo2_l2">--</span></div>
+    <div class="param"><span class="label">MOD</span><span class="val" data-param="lfo2_mod">----</span></div>
+  </section>
+
+  <section class="page-display w-3x3">
+    <div class="header">LFO 3</div>
+    <div class="param"><span class="label">FREQ</span><span class="val" data-param="lfo3_freq">--</span></div>
+    <div class="param"><span class="label">RESET</span><span class="val" data-param="lfo3_reset">---</span></div>
+    <div class="param"><span class="label">HUMAN</span><span class="val" data-param="lfo3_human">---</span></div>
+    <div class="param"><span class="label">WAV</span><span class="val" data-param="lfo3_wav">----</span></div>
+    <div class="param"><span class="label">L1</span><span class="val" data-param="lfo3_l1">--</span></div>
+    <div class="param"><span class="label">DELAY</span><span class="val" data-param="lfo3_delay">--</span></div>
+    <div class="param"><span class="label">L2</span><span class="val" data-param="lfo3_l2">--</span></div>
+    <div class="param"><span class="label">MOD</span><span class="val" data-param="lfo3_mod">----</span></div>
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">ENV 1</div>
+    <div class="param"><span class="label">L1</span><span class="val" data-param="env1_l1">--</span></div>
+    <div class="param"><span class="label">L2</span><span class="val" data-param="env1_l2">--</span></div>
+    <div class="param"><span class="label">L3</span><span class="val" data-param="env1_l3">--</span></div>
+    <div class="param"><span class="label">LV</span><span class="val" data-param="env1_lv">---</span></div>
+    <div class="param"><span class="label">T1V</span><span class="val" data-param="env1_t1v">---</span></div>
+    <div class="param"><span class="label">T1</span><span class="val" data-param="env1_t1">---</span></div>
+    <div class="param"><span class="label">T2</span><span class="val" data-param="env1_t2">---</span></div>
+    <div class="param"><span class="label">T3</span><span class="val" data-param="env1_t3">---</span></div>
+    <div class="param"><span class="label">T4</span><span class="val" data-param="env1_l4">---</span></div>
+    <div class="param"><span class="label">TK</span><span class="val" data-param="env1_tk">---</span></div>
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">ENV 2</div>
+    <div class="param"><span class="label">L1</span><span class="val" data-param="env2_l1">--</span></div>
+    <div class="param"><span class="label">L2</span><span class="val" data-param="env2_l2">--</span></div>
+    <div class="param"><span class="label">L3</span><span class="val" data-param="env2_l3">--</span></div>
+    <div class="param"><span class="label">LV</span><span class="val" data-param="env2_lv">---</span></div>
+    <div class="param"><span class="label">T1V</span><span class="val" data-param="env2_t1v">---</span></div>
+    <div class="param"><span class="label">T1</span><span class="val" data-param="env2_t1">---</span></div>
+    <div class="param"><span class="label">T2</span><span class="val" data-param="env2_t2">---</span></div>
+    <div class="param"><span class="label">T3</span><span class="val" data-param="env2_t3">---</span></div>
+    <div class="param"><span class="label">T4</span><span class="val" data-param="env2_l4">---</span></div>
+    <div class="param"><span class="label">TK</span><span class="val" data-param="env2_tk">---</span></div>
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">ENV 3</div>
+    <div class="param"><span class="label">L1</span><span class="val" data-param="env3_l1">--</span></div>
+    <div class="param"><span class="label">L2</span><span class="val" data-param="env3_l2">--</span></div>
+    <div class="param"><span class="label">L3</span><span class="val" data-param="env3_l3">--</span></div>
+    <div class="param"><span class="label">LV</span><span class="val" data-param="env3_lv">---</span></div>
+    <div class="param"><span class="label">T1V</span><span class="val" data-param="env3_t1v">---</span></div>
+    <div class="param"><span class="label">T1</span><span class="val" data-param="env3_t1">---</span></div>
+    <div class="param"><span class="label">T2</span><span class="val" data-param="env3_t2">---</span></div>
+    <div class="param"><span class="label">T3</span><span class="val" data-param="env3_t3">---</span></div>
+    <div class="param"><span class="label">T4</span><span class="val" data-param="env3_l4">---</span></div>
+    <div class="param"><span class="label">TK</span><span class="val" data-param="env3_tk">---</span></div>
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">ENV 4</div>
+    <div class="param"><span class="label">L1</span><span class="val" data-param="env4_l1">--</span></div>
+    <div class="param"><span class="label">L2</span><span class="val" data-param="env4_l2">--</span></div>
+    <div class="param"><span class="label">L3</span><span class="val" data-param="env4_l3">--</span></div>
+    <div class="param"><span class="label">LV</span><span class="val" data-param="env4_lv">---</span></div>
+    <div class="param"><span class="label">T1V</span><span class="val" data-param="env4_t1v">---</span></div>
+    <div class="param"><span class="label">T1</span><span class="val" data-param="env4_t1">---</span></div>
+    <div class="param"><span class="label">T2</span><span class="val" data-param="env4_t2">---</span></div>
+    <div class="param"><span class="label">T3</span><span class="val" data-param="env4_t3">---</span></div>
+    <div class="param"><span class="label">T4</span><span class="val" data-param="env4_l4">---</span></div>
+    <div class="param"><span class="label">TK</span><span class="val" data-param="env4_tk">---</span></div>
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">FILTER</div>
+    <div class="param span-2"><span class="label">FREQ</span><span class="val" data-param="filt_freq_amt">---</span></div>
+    <div class="param span-2"><span class="label">RES (Q)</span><span class="val" data-param="filt_res_amt">---</span></div>
+    <div class="param"><span class="label">KEYB</span><span class="val" data-param="filt_kbd_amt">---</span></div>
+    <div class="param span-3">
+        <span class="label">MOD1</span>
+            <span class="val">
+                <span data-param="filt_mod1_src">----</span> * <span data-param="filt_mod1_amt">--</span>
+            </span>    
+    </div>  
+    <div class="param span-2">
+        <span class="label">MOD2</span>
+            <span class="val">
+                <span data-param="filt_mod2_src">----</span> * <span data-param="filt_mod2_amt">--</span>
+            </span>    
+    </div>  
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">MODE</div>
+    <div class="param"><span class="label">SYNC</span><span class="val" data-param="mode_sync">---</span></div>
+    <div class="param"><span class="label">AM</span><span class="val" data-param="mode_am">---</span></div>
+    <div class="param span-2"><span class="label">MONO</span><span class="val" data-param="mode_mono">---</span></div>
+    <div class="param"><span class="label">GLIDE</span><span class="val" data-param="mode_glide">---</span></div>
+    <div class="param span-2"><span class="label">VOICE CYC</span><span class="val" data-param="mode_vc">---</span></div>
+    <div class="param"><span class="label">ENV RESTART</span><span class="val" data-param="mode_env">---</span></div>
+    <div class="param"><span class="label">OSC RESTART</span><span class="val" data-param="mode_osc">---</span></div>
+    <div class="param"><span class="label">CYCLE WAVE</span><span class="val" data-param="mode_cyc">---</span></div>
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">SPLIT/LAYER</div>
+    <div class="param"><span class="label">SPLIT/LAYER</span><span class="val" data-param="sl_sl">---</span></div>
+    <div class="param"><span class="label">S/L PROG</span><span class="val" data-param="sl_sl_prog">-----</span></div>
+    <div class="param"><span class="label">LAYER</span><span class="val" data-param="sl_layer">---</span></div>
+    <div class="param span-2"><span class="label">L PROG</span><span class="val" data-param="sl_layer_prog">-----</span></div>
+    <div class="param"><span class="label">SPLIT</span><span class="val" data-param="sl_split">---</span></div>
+    <div class="param span-2"><span class="label">S PROG</span><span class="val" data-param="sl_split_prog">-----</span></div>
+    <div class="param span-2"><span class="label">SPLIT-KEY</span><span class="val" data-param="sl_split_key">---</span></div>
+  </section>
+
+  <section class="page-display w-4x2">
+    <div class="header">DCA 4 FINAL VOLUME</div>
+    <div class="param span-5"><span class="label">PAN</span><span class="val" data-param="dca4_pan">--</span></div>
+    <div class="param span-2"><span class="label">ENV4</span><span class="val" data-param="dca4_env4">---</span></div>
+    <div class="param span-3">
+        <span class="label">MOD</span>
+            <span class="val">
+                <span data-param="dca4_mod_src">----</span> * <span data-param="dca4_mod_amt">--</span>
+            </span>    
+    </div>  
+  </section>
+</div>
+
+</body>
+</html>
